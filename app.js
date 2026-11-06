@@ -192,11 +192,27 @@ function project(id, wk) {
   if (!g) { why.unshift({t: `BYE in week ${wk}`, neg: true}); return {id, p, proj: 0, base, why, bye: true, S}; }
   opp = g[1]; mf = matchupFactor(opp, p.pos);
   const rk = rank(opp, p.pos);
-  if (mf.allowed != null) why.push({t: `${g[2] ? "vs" : "@"} ${opp}: allows ${f1(mf.allowed)} to ${p.pos}s (avg ${f1(mf.lg)}; ${rk} of 32, 1 = easiest) → ×${mf.f.toFixed(2)}`, neg: mf.f < 0.97, pos: mf.f > 1.03});
+  const ord = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
+  const mtxt = rk == null ? "" : rk <= 16 ? `${rk === 1 ? "the" : ord(rk)} easiest ${p.pos} matchup` : `${33 - rk === 1 ? "the" : ord(33 - rk)} toughest ${p.pos} matchup`;
+  if (mf.allowed != null) why.push({t: `${g[2] ? "vs" : "@"} ${opp}: allows ${f1(mf.allowed)} half-PPR pts/g to ${p.pos}s (league avg ${f1(mf.lg)}), ${mtxt} → ×${mf.f.toFixed(2)}`, neg: mf.f < 0.97, pos: mf.f > 1.03});
   for (const n of room.notes) why.push({t: n.t + ` ×${n.f}`, neg: n.neg, pos: !n.neg});
   if (inj.t) why.push({t: inj.t + ` → ×${inj.f}`, neg: true});
-  const proj = base * mf.f * room.adj * inj.f;
-  return {id, p, proj, base, why, opp, home: g[2], mf: mf.f, roomAdj: room.adj, injF: inj.f, S};
+  const adj = mf.f * room.adj * inj.f;
+  const proj = base * adj;
+  // floor / ceiling: his 20th and 80th percentile weeks this season, scaled by the same factors
+  const pts = S.ws.map(w => w.pts).sort((x, y) => x - y);
+  const q = f => { if (!pts.length) return 0; const i = (pts.length - 1) * f, lo = Math.floor(i), hi = Math.ceil(i); return pts[lo] + (pts[hi] - pts[lo]) * (i - lo); };
+  const floor = Math.min(q(0.2) * adj, proj * 0.75), ceil = Math.max(q(0.8) * adj, proj * 1.25);
+  // the position trade-off, in numbers
+  if (S.l4gp) {
+    const g4 = S.l4gp, L = S.l4;
+    if (p.pos === "RB") why.push({t: `RB profile: ${f1((L.car + L.tgt) / g4)} carries+targets/g, ${f1(L.glc / g4)} goal-line carries/g, ${f1(L.tgt / g4)} targets/g (last ${g4})`});
+    else if (p.pos === "WR" || p.pos === "TE") why.push({t: `${p.pos} profile: ${f1(L.tgt / g4)} targets/g, ${pct(L.tshare)} target share, ${L.ypt == null ? "–" : L.ypt.toFixed(1)} yds/target, ${L.rzt} red-zone targets (last ${g4})`});
+    else if (p.pos === "QB") why.push({t: `QB profile: ${f1(L.att / g4)} att/g, ${f1(L.pyd / g4)} pass yds/g, ${f1(L.car / g4)} rushes/g (last ${g4})`});
+  }
+  why.push({t: `Range: floor ${f1(floor)} / ceiling ${f1(ceil)} (his 20th and 80th percentile weeks, same factors)`});
+  const nl = newsLine(id); if (nl) why.push({t: nl});
+  return {id, p, proj, base, floor, ceil, why, opp, home: g[2], mf: mf.f, roomAdj: room.adj, injF: inj.f, S};
 }
 
 /* Rest-of-season value: each remaining game through week 17, with matchup, room and injury. */
@@ -228,17 +244,30 @@ function stamp() {
 
 V.home = () => {
   setTab("home");
-  const r = roster().map(id => BY[id]).filter(Boolean);
-  const top = pos => D.players.filter(p => p.pos === pos && p.gp >= 2).slice(0, 12);
   const pos = V.home.pos || "RB";
+  let list;
+  if (pos === "K") list = (D.kdef.K || []).filter(k => k.gp >= 2).slice(0, 20).map(kRow).join("");
+  else if (pos === "DEF") list = (D.kdef.DEF || []).slice(0, 32).map(defRow).join("");
+  else {
+    const ok = pos === "FLEX" ? (p => p.pos === "RB" || p.pos === "WR" || p.pos === "TE") : (p => p.pos === pos);
+    list = D.players.filter(p => ok(p) && p.gp >= 2).slice(0, pos === "FLEX" ? 25 : 15).map(p => plRow(p, pos === "FLEX")).join("");
+  }
+  const note = pos === "K" ? "Kickers: FG 0–39 = 3, 40–49 = 4, 50+ = 5, PAT = 1."
+    : pos === "DEF" ? "Defenses: sack 1, INT / fumble rec / safety / block 2, TD 6, plus points-allowed tiers (0 = 10 … 35+ = −4)." : "";
   return `
-  ${r.length ? `<h2>My roster</h2><div class="card list">${r.map(plRow).join("")}</div>` : ""}
-  <h2>Top half-PPR scorers</h2>
-  <div class="seg">${["QB","RB","WR","TE"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>
-  <div class="card list">${top(pos).map(plRow).join("")}</div>
+  <h2>Top scorers per game</h2>
+  <div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>
+  <div class="card list">${list || '<p class="muted">No data yet.</p>'}</div>
+  ${note ? `<p class="note">${note}</p>` : ""}
   ${stamp()}`;
 };
-function plRow(p) {
+function kRow(k, i) {
+  return `<div class="pl" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span class="muted small" style="width:20px">${i + 1}</span>${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+}
+function defRow(d, i) {
+  return `<div class="pl" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span class="muted small" style="width:20px">${i + 1}</span><span class="grow"><b>${esc(d.team)} D/ST</b><br><span class="muted small">${d.sack} sacks · ${d.int} INT · ${d.fr} FR · ${d.td} TD · allows ${f1(d.papg)}/g</span></span><span class="r"><b>${f1(d.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+}
+function plRow(p, showPos) {
   return `<a class="pl" href="#/p/${p.id}">${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)}<br><span class="muted small">${p.pos} · ${p.team}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
 }
 
@@ -284,6 +313,12 @@ function roomTable(id) {
   ${R.notes.length ? `<ul class="why">${R.notes.map(n => `<li>${esc(n.t)}</li>`).join("")}</ul>` : ""}`;
 }
 
+function newsLine(id) {
+  const c = (D.news?.cards || []).find(c => c.pid === id);
+  if (!c) return "";
+  const it = c.items[0];
+  return `Latest news (${when(it.t)}, ${it.src}): ${it.head}${it.body && it.body !== it.head ? " " + it.body.slice(0, 220) : ""}`;
+}
 function newsFor(id, n = 3) {
   const c = (D.news?.cards || []).find(c => c.pid === id);
   if (!c) return `<p class="muted small">No news in the last 10 days.</p>`;
@@ -377,11 +412,15 @@ V.compare = (a, b) => {
   row("Status", A.inj || "Healthy", B.inj || "Healthy", x => x, null);
   return `
   <h1>Compare</h1>
-  <div class="scroll" style="margin-top:10px"><table class="cmp"><thead><tr><th></th><th><a href="#/p/${a}">${esc(A.name)}</a><br><span class="muted">${A.pos} · ${A.team}</span></th><th><a href="#/p/${b}">${esc(B.name)}</a><br><span class="muted">${B.pos} · ${B.team}</span></th></tr></thead>
+  ${anaPanel("compare", [a, b], true)}
+  <div id="nums"><div class="scroll" style="margin-top:10px"><table class="cmp"><thead><tr><th></th><th><a href="#/p/${a}">${esc(A.name)}</a><br><span class="muted">${A.pos} · ${A.team}</span></th><th><a href="#/p/${b}">${esc(B.name)}</a><br><span class="muted">${B.pos} · ${B.team}</span></th></tr></thead>
   <tbody>${rows.join("")}</tbody></table></div>
   <p class="note">Green = the better number.</p>
   <div class="row wrap" style="margin:10px 0"><a class="btn ghost sm" href="#/c/${b}/${a}">Swap</a><button class="btn ghost sm" data-act="ss2" data-ids="${a},${b}">Start/Sit these two</button></div>
   ${roomTable(a)}${roomTable(b)}
+  ${[a, b].map(id => { const P = project(id, wk); return `<h2>${esc(BY[id].name)}: week ${wk} factors</h2><ul class="why">${P.why.map(w => `<li>${esc(w.t)}</li>`).join("")}</ul>`; }).join("")}
+  ${[a, b].map(id => { const c = (D.news?.cards || []).find(c => c.pid === id); return c ? `<h2>${esc(BY[id].name)}: latest news</h2>${newsCard(c, 3, false)}` : ""; }).join("")}
+  </div>
   <h2>Change player</h2>${pickB}
   ${stamp()}`;
 };
@@ -412,23 +451,34 @@ function wirePicker(key) {
 }
 V.ss = () => {
   setTab("ss");
-  V.ssIds = V.ssIds || [];
+  V.ssIds = (V.ssIds || []).filter(id => BY[id]);
+  V.ssSlots = Math.max(3, V.ssSlots || 3, V.ssIds.length + (V.ssIds.length >= 3 ? 0 : 1));
+  const n = V.ssIds.length;
+  V.ssN = Math.min(Math.max(1, V.ssN || 1), Math.max(1, n - 1));
   const wk = nextWeek();
   const r = roster().filter(id => BY[id] && !V.ssIds.includes(id));
-  let out = "";
-  if (V.ssIds.length >= 2) {
-    const res = V.ssIds.map(id => project(id, wk)).sort((x, y) => y.proj - x.proj);
-    V.ssLast = {wk, res};
-    out = `<h2>Week ${wk} ranking</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
-      <div class="grow"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a> <span class="muted small">${x.p.pos} · ${x.p.team}</span> ${injBadge(x.p)}
-      <div class="small" style="margin-top:2px">${i === 0 ? '<b class="v-good">START</b>' : i < Math.ceil(res.length / 2) && res.length > 2 ? '<b class="v-even">FLEX</b>' : '<b class="v-bad">SIT</b>'}</div>
-      <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg ? "" : w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
-      <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span></div></div>`).join("") +
-      `<p class="note">Projection = 60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
-      <button class="btn" data-act="ask-ss">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
+  const slots = [];
+  for (let i = 0; i < V.ssSlots; i++) {
+    const id = V.ssIds[i];
+    slots.push(id ? `<div class="pl-wrap">${plRow(BY[id])}<button class="rm" data-rm="ssIds" data-id="${id}" aria-label="Remove ${esc(BY[id].name)}">Remove</button></div>`
+      : `<div class="pick" style="padding:8px 0;border-bottom:1px solid var(--line)"><input class="ss-slot" data-slot="${i}" placeholder="Player ${i + 1}: search…" autocomplete="off"><div class="sugg" hidden></div></div>`);
   }
-  return `<h1>Start / Sit</h1><p class="muted small">Add two or more players. Week ${wk}.</p>
-  ${listPicker("ssIds", "Add a player…")}
+  let out = "";
+  if (n >= 2) {
+    const res = V.ssIds.map(id => project(id, wk)).sort((x, y) => y.proj - x.proj);
+    V.ssLast = {wk, res, start: V.ssN};
+    out = anaPanel("startsit", [...res.map(x => x.id), "start" + V.ssN], false) + `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
+      <div class="grow"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a> <span class="muted small">${x.p.pos} · ${x.p.team}</span> ${injBadge(x.p)}
+      <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
+      <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
+      <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span><div class="tiny muted" style="margin-top:4px">${x.bye ? "" : `${f1(x.floor)}–${f1(x.ceil)}`}</div></div></div>`).join("") +
+      `</div><p class="note">Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. Projection = 60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
+      <button class="btn ghost" data-act="ask-ss">Ask the coach on Telegram</button>`;
+  }
+  return `<h1>Start / Sit</h1><p class="muted small">Add 3 or more players, any positions. It ranks them all like a FLEX call. Week ${wk}.</p>
+  <div class="card list">${slots.join("")}</div>
+  <div class="row wrap" style="margin-top:8px"><button class="btn ghost sm" data-act="ss-add">+ Add player</button>
+    ${n >= 2 ? `<span class="muted small" style="margin-left:6px">Slots to fill:</span>${Array.from({length: Math.max(1, n - 1)}, (_, i) => i + 1).map(k => `<button class="chip ${k === V.ssN ? "on" : ""}" data-ssn="${k}">${k}</button>`).join("")}` : ""}</div>
   ${r.length ? `<p class="small muted" style="margin:10px 0 4px">From my roster:</p><div class="chips">${r.map(id => `<button class="chip" data-addss="${id}">+ ${esc(BY[id].name)}</button>`).join("")}</div>` : ""}
   ${out}`;
 };
@@ -449,10 +499,12 @@ V.trade = () => {
     const tbl = (xs, t) => `<h2>${t}</h2><div class="scroll"><table><thead><tr><th>Player</th><th>ROS pts</th><th>Per game</th><th>L4 ppg</th><th>Season ppg</th><th>Games left</th><th>Sched</th><th>Share L4</th><th>Room</th><th>Status</th></tr></thead><tbody>
       ${xs.map(x => `<tr><td><a href="#/p/${x.id}">${esc(x.p.name)}</a> <span class="muted">${x.p.pos}</span></td><td><b>${f1(x.total)}</b></td><td>${f1(x.base)}</td><td>${f1(x.S.l4.ppg)}</td><td>${f1(x.S.s.ppg)}</td><td>${x.games - x.miss}${x.miss ? ` <span class="muted">(-${x.miss})</span>` : ""}</td><td>${x.sos.toFixed(2)}</td><td>${pct(share(x.p.pos, x.S.l4))}</td><td>×${x.roomAdj.toFixed(2)}</td><td>${x.p.inj || "–"}</td></tr>`).join("")}
       <tr class="tot"><td>Total</td><td>${f1(xs.reduce((a, x) => a + x.total, 0))}</td><td colspan="8"></td></tr></tbody></table></div>
-      ${xs.flatMap(x => x.roomNotes.map(n => `<p class="small ink2">• ${esc(n.t)}</p>`)).join("")}`;
-    out = `<div class="card"><div class="verdict ${verdict[1]}">${verdict[0]}</div><div>${verdict[2]}</div>
+      ${xs.flatMap(x => x.roomNotes.map(n => `<p class="small ink2">• ${esc(n.t)}</p>`)).join("")}
+      ${xs.map(x => newsLine(x.id)).filter(Boolean).map(t => `<p class="small ink2">• ${esc(t)}</p>`).join("")}`;
+    out = `<div id="nums"><div class="card"><div class="verdict ${verdict[1]}">${verdict[0]}</div><div>${verdict[2]}</div>
       <div class="small muted" style="margin-top:4px">You give ${f1(tg)} · you get ${f1(tr)} projected half-PPR points through week ${LAST_FANTASY_WEEK}.</div></div>
-      ${tbl(G, "You give")}${tbl(R, "You get")}
+      ${tbl(G, "You give")}${tbl(R, "You get")}</div>
+      ${anaPanel("trade", [...V.give, "|", ...V.get], false)}
       <p class="note">ROS points = per-game value (60% last 4 + 40% season) × each remaining opponent's points allowed to the position (half weight) × room changes, minus games lost to injury (IR = 4 weeks, Out = 1). Byes counted. Sched 1.00 = average; higher = easier.</p>
       <button class="btn" data-act="ask-trade">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
   }
@@ -467,8 +519,11 @@ V.roster = () => {
   setTab("roster");
   const r = roster().filter(id => BY[id]);
   V.rIds = r;
-  return `<h1>My roster</h1><p class="muted small">Saved on this device only. Used as quick picks for Start/Sit and to filter News.</p>
-  ${listPicker("rIds", "Add a player…")}
+  const order = {QB: 0, RB: 1, WR: 2, TE: 3};
+  const sorted = r.map(id => BY[id]).sort((a, b) => (order[a.pos] - order[b.pos]) || (b.ppg - a.ppg));
+  return `<h1>My roster</h1><p class="muted small">Saved on this device only. Used for Start/Sit quick picks and the News filter.</p>
+  <div class="pick" style="margin-top:10px"><input id="pk-rIds" placeholder="Add a player to my roster…" autocomplete="off"><div id="pks-rIds" class="sugg" hidden></div></div>
+  <div class="card list">${sorted.length ? sorted.map(p => `<div class="pl-wrap">${plRow(p)}<button class="rm" data-rm="rIds" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join("") : '<p class="muted">No players yet. Search above or paste names below.</p>'}</div>
   <h2>Paste names</h2>
   <textarea id="names" rows="4" placeholder="One per line or comma separated"></textarea>
   <div class="row" style="margin-top:8px"><button class="btn" data-act="paste">Add names</button><button class="btn ghost" data-act="clear">Clear roster</button></div>
@@ -483,12 +538,79 @@ async function ask(text) {
 }
 function askSS() {
   const {wk, res} = V.ssLast;
-  return `Start/sit, week ${wk}, half PPR. My Stat Hub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
+  return `Start/sit, week ${wk}, half PPR, starting ${V.ssLast.start}. My Stat Hub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
 }
 function askTrade() {
   const {G, R, tg, tr, verdict} = V.tradeLast;
   const l = x => `${x.p.name} (${x.p.pos} ${x.p.team}): ROS ${f1(x.total)}, ${f1(x.base)}/g, L4 ${f1(x.S.l4.ppg)}, season ${f1(x.S.s.ppg)}, ${x.games - x.miss} games left, sched ${x.sos.toFixed(2)}, ${x.p.inj || "healthy"}`;
   return `Trade check, half PPR. Stat Hub says ${verdict[0]} (give ${f1(tg)} vs get ${f1(tr)} ROS pts).\nI give: ${G.map(l).join(" | ")}\nI get: ${R.map(l).join(" | ")}\nYour take in a few lines?`;
+}
+
+/* ---------------- written analysis (Claude, only when he asks; cached per player set per day) ---------------- */
+const ANA = {};   // key -> {status, text, ...}
+function anaKey(kind, ids) { return kind + ":" + (kind === "compare" ? [...ids].sort() : ids).join(","); }
+function anaPanel(kind, ids, auto) {
+  const k = anaKey(kind, ids), st = ANA[k];
+  const label = kind === "compare" ? "Analysis" : kind === "trade" ? "Trade write-up" : "Start/sit write-up";
+  let inner;
+  if (!st || st.status === "none") inner = auto ? `<p class="muted small"><span class="spin"></span>Starting…</p>`
+    : `<button class="btn" data-act="ana" data-kind="${kind}">Write the analysis</button> <span class="muted small">about 30–60 seconds; checks this week's injury news</span>`;
+  else if (st.status === "working") inner = `<p class="muted small"><span class="spin"></span>Writing it now: pulling this week's injury and news context, then reading the numbers. About 30–60 seconds.</p>`;
+  else if (st.status === "error") inner = `<p class="small v-bad">${esc(st.error || "Couldn't write it.")}</p><button class="btn ghost sm" data-act="ana" data-kind="${kind}">Try again</button>`;
+  else if (st.status === "offline") inner = `<p class="small muted">Written analysis runs on the iMac. Open the hub from the iMac's address (http://192.168.68.62:8765) to use it.</p>`;
+  else inner = md(st.text) + `<p class="note">Written ${when(st.at)} from the numbers above plus a web check of injuries and news. Saved for today, so reopening it is free.</p>`;
+  return `<div class="ana" id="ana" data-kind="${kind}" data-ids="${ids.join(",")}"><div class="lbl">${label}</div>${inner}</div>`;
+}
+function md(t) {
+  const lines = esc(t || "").split("\n"); let out = "", inList = false;
+  const inline = x => x.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*(?!\s)(.+?)\*/g, "$1<i>$2</i>");
+  for (const ln of lines) {
+    const l = ln.trim();
+    if (/^[-*] /.test(l)) { if (!inList) { out += "<ul>"; inList = true; } out += `<li>${inline(l.slice(2))}</li>`; continue; }
+    if (inList) { out += "</ul>"; inList = false; }
+    if (/^#{1,4} /.test(l)) out += `<h3>${inline(l.replace(/^#+ /, ""))}</h3>`;
+    else if (l) out += `<p>${inline(l)}</p>`;
+  }
+  return out + (inList ? "</ul>" : "");
+}
+async function anaCheck(kind, ids, auto) {
+  const k = anaKey(kind, ids);
+  if (ANA[k] && ANA[k].status !== "none") { if (ANA[k].status === "working") anaPoll(kind, ids); return; }
+  try {
+    const r = await fetch(`/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`);
+    if (!r.ok) throw 0;
+    ANA[k] = await r.json();
+  } catch { ANA[k] = {status: "offline"}; }
+  if (ANA[k].status === "working") anaPoll(kind, ids);
+  else if (ANA[k].status === "none" && auto) return anaStart(kind, ids);
+  refreshAna(kind, ids);
+}
+async function anaStart(kind, ids) {
+  const k = anaKey(kind, ids);
+  const nums = ($("#nums")?.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000);
+  const names = ids.map(id => BY[id]?.name || id);
+  ANA[k] = {status: "working"}; refreshAna(kind, ids);
+  try {
+    const r = await fetch("/api/analysis", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({kind, ids, names, numbers: nums})});
+    if (!r.ok) throw 0;
+    ANA[k] = await r.json();
+  } catch { ANA[k] = {status: "offline"}; }
+  refreshAna(kind, ids);
+  if (ANA[k].status === "working") anaPoll(kind, ids);
+}
+function anaPoll(kind, ids) {
+  const k = anaKey(kind, ids);
+  clearTimeout(anaPoll.t);
+  anaPoll.t = setTimeout(async () => {
+    try { const r = await fetch(`/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`); ANA[k] = await r.json(); } catch {}
+    refreshAna(kind, ids);
+    if (ANA[k]?.status === "working") anaPoll(kind, ids);
+  }, 3000);
+}
+function refreshAna(kind, ids) {
+  const el = $("#ana");
+  if (el && el.dataset.kind === kind && el.dataset.ids === ids.join(",")) el.outerHTML = anaPanel(kind, ids, false);
 }
 
 /* ---------------- router ---------------- */
@@ -504,17 +626,24 @@ function render() {
   else if (r && r.startsWith("roster")) html = V.roster();
   else html = V.home();
   $("#app").innerHTML = html;
-  ["ssIds", "give", "get", "rIds"].forEach(wirePicker);
+  ["give", "get", "rIds"].forEach(wirePicker);
+  document.querySelectorAll(".ss-slot").forEach(inp => attachSearch(inp, inp.nextElementSibling, p => {
+    if (!V.ssIds.includes(p.id)) V.ssIds.push(p.id);
+    render(); setTimeout(() => document.querySelector(".ss-slot")?.focus(), 0);
+  }));
+  const anaEl = $("#ana");
+  if (anaEl) anaCheck(anaEl.dataset.kind, anaEl.dataset.ids.split(","), anaEl.dataset.kind === "compare");
 }
 let lastHash = "";
 window.addEventListener("hashchange", () => { if (location.hash.split("/")[1] !== lastHash.split("/")[1] || location.hash.startsWith("#/p") || location.hash.startsWith("#/c")) scrollTo(0, 0); lastHash = location.hash; render(); });
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss]");
+  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn]");
   if (!t) return;
   if (t.dataset.pos) { V.home.pos = t.dataset.pos; render(); return; }
   if (t.dataset.nf) { V.news.f = t.dataset.nf; render(); return; }
   if (t.dataset.rm) { V[t.dataset.rm] = V[t.dataset.rm].filter(x => x !== t.dataset.id); if (t.dataset.rm === "rIds") setRoster(V.rIds); render(); return; }
+  if (t.dataset.ssn) { V.ssN = +t.dataset.ssn; render(); return; }
   if (t.dataset.addss) { V.ssIds = V.ssIds || []; V.ssIds.push(t.dataset.addss); render(); return; }
   const id = t.dataset.id;
   switch (t.dataset.act) {
@@ -532,6 +661,8 @@ document.addEventListener("click", e => {
     }
     case "clear": setRoster([]); render(); break;
     case "ask-ss": ask(askSS()); break;
+    case "ss-add": V.ssSlots = (V.ssSlots || 3) + 1; render(); setTimeout(() => [...document.querySelectorAll(".ss-slot")].pop()?.focus(), 0); break;
+    case "ana": { const a = $("#ana"); anaStart(a.dataset.kind, a.dataset.ids.split(",")); break; }
     case "ask-trade": ask(askTrade()); break;
   }
 });
@@ -541,6 +672,7 @@ document.addEventListener("click", e => {
   try {
     [D.meta, D.players, D.stats, D.teams] = await Promise.all(["meta", "players", "stats", "teams"].map(load));
     D.news = await load("news").catch(() => ({cards: [], updated: D.meta.updated}));
+    D.kdef = await load("kdef").catch(() => ({K: [], DEF: []}));
   } catch (e) {
     $("#app").innerHTML = `<p>Couldn't load the data (${esc(e.message)}). Pull to refresh.</p>`; return;
   }
