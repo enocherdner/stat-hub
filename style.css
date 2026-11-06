@@ -201,3 +201,23 @@ body{background:transparent!important}
 .rt .rk{display:inline-block;width:26px}
 @media (max-width:1023px){table.mx .at{display:none}table.mx td,table.mx th{font-size:9.5px;letter-spacing:-.2px;padding:6px 0}}
 .only-narrow-inline{display:inline}@media(min-width:1024px){.only-narrow-inline{display:none}}
+
+/* ======================= Round 7: much more see-through ======================= */
+:root[data-look="gameday"] .card,:root[data-look="gameday"] .scroll,:root[data-look="gameday"] .subtabs{background:rgba(10,16,32,.40);backdrop-filter:blur(2.5px);-webkit-backdrop-filter:blur(2.5px);border-color:rgba(255,255,255,.10)}
+:root[data-look="gameday"] .ana{background:linear-gradient(rgba(10,16,32,.52),rgba(10,16,32,.52)) padding-box,var(--grad) border-box;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+:root[data-look="gameday"] .tile,:root[data-look="gameday"] .wkc,:root[data-look="gameday"] .roomc,:root[data-look="gameday"] .chart{background:rgba(20,28,52,.42)}
+:root[data-look="gameday"] .chip{background:rgba(20,28,52,.45);border-color:rgba(255,255,255,.16)}
+:root[data-look="gameday"] .chip.on{background:var(--grad)}
+:root[data-look="gameday"] .top{background:rgba(7,12,24,.50)!important;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+:root[data-look="gameday"] .tabs{background:rgba(7,12,24,.48);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+:root[data-look="gameday"] .search input{background:rgba(7,12,24,.45)}
+:root[data-look="gameday"] th{background:rgba(10,16,32,.55)}
+:root[data-look="gameday"] td:first-child,:root[data-look="gameday"] table.mx td:first-child{background:rgba(10,16,32,.45)}
+:root[data-look="gameday"] tr.tot td,:root[data-look="gameday"] tr.tot td:first-child{background:rgba(23,33,58,.55)}
+:root[data-look="gameday"] .room tr.me td{background:rgba(124,58,237,.28)}
+:root[data-look="gameday"] #app>p.muted,:root[data-look="gameday"] #app>p.note{background:rgba(7,12,24,.32)}
+:root[data-look="gameday"] .sugg{background:rgba(12,19,36,.95)}
+/* readability on glass: a soft shadow under all text */
+:root[data-look="gameday"] main,:root[data-look="gameday"] .tabs,:root[data-look="gameday"] .top{text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 6px rgba(0,0,0,.55)}
+:root[data-look="gameday"] .muted,:root[data-look="gameday"] .ink2{color:#c3cbe0}
+:root[data-look="gameday"] .badge,:root[data-look="gameday"] .sig,:root[data-look="gameday"] .btn,:root[data-look="gameday"] .rk.gold{text-shadow:none}

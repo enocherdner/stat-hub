@@ -596,6 +596,18 @@ function rosterContext(extraGive = [], extraGet = []) {
   return `<h2>Your roster</h2><div class="card small ink2" style="white-space:pre-line">${esc(line(ids))}</div>` +
     (extraGive.length || extraGet.length ? `<h2>Your roster after the trade</h2><div class="card small ink2" style="white-space:pre-line">${esc(line(after))}</div>` : "");
 }
+/* The same roster facts as plain text, sent quietly with trade / start-sit write-ups (not shown on the page). */
+function rosterText(give = [], get = []) {
+  const ids = roster().filter(id => BY[id]);
+  if (!ids.length) return "His roster: not entered.";
+  const wk = nextWeek();
+  const line = list => ["QB", "RB", "WR", "TE"].map(pos => {
+    const ps = list.map(id => BY[id]).filter(p => p && p.pos === pos).sort((a, b) => b.ppg - a.ppg);
+    return `${pos} (${ps.length}): ` + (ps.map(p => { const b = byeWeek(p.team); return `${p.name} ${p.team} ${f1(p.ppg)} ppg, ${b == null ? "bye ?" : b < wk ? "bye done" : b === wk ? "ON BYE THIS WEEK" : "bye wk " + b}${p.inj ? ", " + p.inj : ""}`; }).join("; ") || "none");
+  }).join("\n");
+  const after = ids.filter(id => !give.includes(id)).concat(get.filter(id => !ids.includes(id)));
+  return `HIS ROSTER (this is week ${wk}):\n${line(ids)}` + (give.length || get.length ? `\n\nHIS ROSTER AFTER THE TRADE:\n${line(after)}` : "");
+}
 function rosterTag() {
   const r = roster().slice().sort().join(","); let h = 0;
   for (const c of r) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -725,7 +737,6 @@ function ssFromRoster(g) {
 }
 V.ss = () => {
   setTab("ss");
-  if (V.ssIds === undefined && roster().length) ssFromRoster("FLEX");   // first visit: his own RB/WR/TE
   V.ssIds = (V.ssIds || []).filter(id => BY[id]);
   V.ssSlots = Math.max(3, V.ssSlots || 3, V.ssIds.length + (V.ssIds.length >= 3 ? 0 : 1));
   const n = V.ssIds.length;
@@ -747,16 +758,13 @@ V.ss = () => {
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
       <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span><div class="tiny muted" style="margin-top:4px">${x.bye ? "" : `${f1(x.floor)}–${f1(x.ceil)}`}</div></div></div>`).join("") +
-      rosterContext() + `</div><p class="note">Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. Projection = 60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
+      `</div><p class="note">${roster().length ? "Your roster is factored into the write-up (depth, byes, who else you could start). " : ""}Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. Projection = 60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
       <button class="btn ghost" data-act="ask-ss">Ask the coach on Telegram</button>`;
   }
   return `<h1>Start / Sit</h1><p class="muted small">Add 3 or more players, any positions. It ranks them all like a FLEX call. Week ${wk}.</p>
-  ${roster().length ? `<div class="seg"><span class="muted small" style="align-self:center">From my roster:</span>${Object.keys(SS_GROUPS).map(g => `<button class="chip ${V.ssGroup === g ? "on" : ""}" data-ssg="${g}">My ${g === "FLEX" ? "RB/WR/TE" : g + "s"}</button>`).join("")}<button class="chip" data-act="ss-clear">Clear</button></div>` : ""}
-  ${V.ssOut && V.ssOut.length ? `<p class="small muted">Left out: ${esc(V.ssOut.join(", "))}</p>` : ""}
   <div class="card list">${slots.join("")}</div>
   <div class="row wrap" style="margin-top:8px"><button class="btn ghost sm" data-act="ss-add">+ Add player</button>
     ${n >= 2 ? `<span class="muted small" style="margin-left:6px">Slots to fill:</span>${Array.from({length: Math.max(1, n - 1)}, (_, i) => i + 1).map(k => `<button class="chip ${k === V.ssN ? "on" : ""}" data-ssn="${k}">${k}</button>`).join("")}` : ""}</div>
-  ${r.length ? `<p class="small muted" style="margin:10px 0 4px">Add one from my roster:</p><div class="chips">${r.map(id => `<button class="chip" data-addss="${id}">+ ${esc(BY[id].name)}</button>`).join("")}</div>` : ""}
   ${out}`;
 };
 
@@ -783,7 +791,7 @@ V.trade = () => {
     out = `<div id="nums"><div class="card"><div class="verdict ${verdict[1]}">${verdict[0]}</div><div>${verdict[2]}</div>
       <div class="small muted" style="margin-top:4px">You give ${f1(tg)} · you get ${f1(tr)} projected half-PPR points through week ${LAST_FANTASY_WEEK}.</div></div>
       ${tbl(G, "You give")}${tbl(R, "You get")}
-      ${rosterContext(V.give, V.get) || `<p class="note">Add your players on the My Roster tab and the write-up will weigh positional need, depth and byes.</p>`}</div>
+      ${roster().length ? `<p class="note">Your roster is factored into the write-up (positional need, depth, byes).</p>` : `<p class="note">Add your players on the My Roster tab and the write-up will weigh positional need, depth and byes.</p>`}</div>
       ${anaPanel("trade", [...V.give, "|", ...V.get, rosterTag()], false)}
       <p class="note">ROS points = per-game value (75% season + 25% last 4, × usage trend: last-4 share vs season, half weight) × each remaining opponent's points allowed to the position (half weight) × room changes, minus games lost to injury (IR = 4 weeks, Out = 1). Byes counted. Sched 1.00 = average; higher = easier.</p>
       <button class="btn" data-act="ask-trade">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
@@ -879,7 +887,8 @@ async function published(kind, ids) {
 }
 async function anaStart(kind, ids) {
   const k = anaKey(kind, ids);
-  const nums = ($("#nums")?.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000);
+  let nums = ($("#nums")?.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 11000);
+  if (kind === "trade" || kind === "startsit") nums += "\n\n" + rosterText(kind === "trade" ? V.give : [], kind === "trade" ? V.get : []);
   const names = ids.map(id => BY[id]?.name || id);
   ANA[k] = {status: "working"}; refreshAna(kind, ids);
   try {

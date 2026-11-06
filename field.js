@@ -77,7 +77,7 @@
     // night-game dimming so content on top stays readable
     g.setTransform(1, 0, 0, 1, 0, 0);
     const grad = g.createRadialGradient(bg.width / 2, bg.height / 2, 0, bg.width / 2, bg.height / 2, Math.max(bg.width, bg.height) * 0.75);
-    grad.addColorStop(0, "rgba(5,10,22,.38)"); grad.addColorStop(1, "rgba(5,10,22,.62)");
+    grad.addColorStop(0, "rgba(5,10,22,.22)"); grad.addColorStop(1, "rgba(5,10,22,.48)");
     g.fillStyle = grad; g.fillRect(0, 0, bg.width, bg.height);
   }
 
@@ -137,7 +137,7 @@
     if (!play) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const s = scale(), r = Math.max(4, Math.min(11, s * 0.75));
-    ctx.globalAlpha = 0.62 * Math.max(0, alpha);
+    ctx.globalAlpha = 0.85 * Math.max(0, alpha);
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     // line of scrimmage and the real end spot
     ctx.strokeStyle = "rgba(96,165,250,.8)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
@@ -151,16 +151,28 @@
     ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 2;
     for (const o of [...play.O, play.qb, play.carrier]) { const [x, y] = P(...o); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); }
     for (const xx of play.X) { const [x, y] = P(...xx); ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke(); }
-    // the throw
-    if (play.ball) {
-      ctx.setLineDash([3, 7]); ctx.strokeStyle = "rgba(255,255,255,.75)";
-      const bf = Math.min(1, f / 0.55), [q, c] = play.ball;
-      const [x1, y1] = P(...q), [x2, y2] = P(q[0] + (c[0] - q[0]) * bf, q[1] + (c[1] - q[1]) * bf);
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
-    }
     // the route / run, drawn as it happens
     const cum = play.cum || (play.cum = seg(play.path));
     const [hu, hv, k] = along(play.path, cum, f);
+    // where the ball is: passes leave the QB so they land as the receiver reaches the catch spot;
+    // on runs the ball stays with the runner
+    let ballAt = [hu, hv];
+    if (play.ball) {
+      const [q, c] = play.ball;
+      const fc = cum[2] / cum[cum.length - 1];                       // receiver reaches the catch spot
+      const air = Math.hypot(c[0] - q[0], c[1] - q[1]);
+      const flight = Math.min(fc - 0.04, Math.max(0.1, Math.min(0.3, air / 55 * 0.3)));
+      const launch = fc - flight;
+      let bu = q[0], bv = q[1];
+      if (f >= fc) { bu = hu; bv = hv; }
+      else if (f >= launch) { const t = (f - launch) / flight; bu = q[0] + (c[0] - q[0]) * t; bv = q[1] + (c[1] - q[1]) * t; }
+      if (f >= launch) {
+        const to = f >= fc ? c : [bu, bv];
+        ctx.setLineDash([3, 7]); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(...P(...q)); ctx.lineTo(...P(...to)); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ballAt = [bu, bv];
+    }
     ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(...P(...play.path[0]));
     for (let i = 1; i < k; i++) ctx.lineTo(...P(...play.path[i]));
@@ -171,12 +183,20 @@
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - ah * Math.cos(ang - 0.45), hy - ah * Math.sin(ang - 0.45));
     ctx.moveTo(hx, hy); ctx.lineTo(hx - ah * Math.cos(ang + 0.45), hy - ah * Math.sin(ang + 0.45)); ctx.stroke();
     ctx.fillStyle = "#a78bfa"; ctx.beginPath(); ctx.arc(hx, hy, r * 0.75, 0, 7); ctx.fill();
+    // the football
+    const [bx, by] = P(...ballAt), br = Math.max(4, r * 0.85);
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(vert ? -Math.PI / 2 : 0);
+    ctx.fillStyle = "#b5651d"; ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(0, 0, br * 1.25, br * 0.75, 0, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-br * 0.45, 0); ctx.lineTo(br * 0.45, 0); ctx.stroke();
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
   function caption() {
     const p = plays[idx]?.p; if (!p) { cap.hidden = true; return; }
     cap.hidden = false;
     cap.textContent = "▶ " + p.caption + " ⓘ";
+    cap.title = (p.matchup ? p.matchup + ". " : "") + NOTE;
   }
 
   function size() {
