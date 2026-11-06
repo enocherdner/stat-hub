@@ -340,6 +340,57 @@ function heat(v, lo, hi) {
   const stops = ["#5b1f2a", "#6b3a2a", "#3a3f55", "#2a5a3c", "#1f7a45"];
   return stops[Math.min(4, Math.floor(t * 5))];
 }
+/* Schedule strength without the wall of colors: one player's schedule, or ranked lists. */
+function schedStats(team, pos, from, to) {
+  const games = (D.teams.sched[team] || []).filter(g => !g[3] && g[0] >= from && g[0] <= to);
+  const vals = games.map(g => (D.teams.dvp[g[1]] || {})[pos]).filter(v => v != null);
+  return {games, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null};
+}
+function teamSchedRanks(pos, from, to) {
+  const rows = Object.keys(D.teams.sched).map(t => ({t, ...schedStats(t, pos, from, to)})).filter(r => r.avg != null).sort((a, b) => b.avg - a.avg);
+  const rank = {}; rows.forEach((r, i) => rank[r.t] = i + 1);
+  return {rows, rank, n: rows.length};
+}
+function ord(n) { return n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"); }
+function easeTag(v, pos) {
+  const lg = D.teams.league[pos]; if (v == null || !lg) return `<span class="ez avg">–</span>`;
+  const r = v / lg;
+  return r >= 1.08 ? `<span class="ez easy">Easy</span>` : r <= 0.92 ? `<span class="ez hard">Hard</span>` : `<span class="ez avg">Avg</span>`;
+}
+function rankWords(rank, n, pos, what) {
+  return rank <= n / 2 ? `${rank === 1 ? "Easiest" : ord(rank) + " easiest"} ${pos} ${what}` : `${n - rank + 1 === 1 ? "Toughest" : ord(n - rank + 1) + " toughest"} ${pos} ${what}`;
+}
+function schedView(pos) {
+  const wk = nextWeek(), PO = [15, LAST_FANTASY_WEEK];
+  const ros = teamSchedRanks(pos, wk, LAST_FANTASY_WEEK), po = teamSchedRanks(pos, PO[0], PO[1]);
+  const pick = V.schedP && BY[V.schedP] ? BY[V.schedP] : null;
+  let one = "";
+  if (pick && pos === pick.pos) {
+    const st = schedStats(pick.team, pos, wk, LAST_FANTASY_WEEK);
+    const all = (D.teams.sched[pick.team] || []).filter(g => !g[3] && g[0] >= wk && g[0] <= LAST_FANTASY_WEEK);
+    const weeksAll = []; for (let w = wk; w <= LAST_FANTASY_WEEK; w++) weeksAll.push(w);
+    one = `<div class="card"><div class="row wrap"><a href="#/p/${pick.id}"><b>${esc(pick.name)}</b></a><span class="muted small">${pick.pos} · ${pick.team}</span>
+      <span class="small" style="margin-left:auto">${rankWords(ros.rank[pick.team], ros.n, pos, "schedule ROS")} · ${rankWords(po.rank[pick.team], po.n, pos, "playoff schedule")}</span></div>
+      <div class="schedrows">${weeksAll.map(w => { const g = all.find(x => x[0] === w); if (!g) return `<div class="sr ${w >= 15 ? "po" : ""}"><b>Wk ${w}</b><span class="muted">BYE</span><span></span></div>`;
+        const v = (D.teams.dvp[g[1]] || {})[pos]; return `<div class="sr ${w >= 15 ? "po" : ""}"><b>Wk ${w}</b><span>${g[2] ? "vs" : "@"} ${g[1]} <span class="muted tiny">allows ${v == null ? "?" : f1(v)} to ${pos}s</span></span>${easeTag(v, pos)}</div>`; }).join("")}</div></div>`;
+  } else if (pick) one = `<p class="muted small">Pick the ${pick.pos} tab to see ${esc(pick.name)}'s schedule.</p>`;
+  const teamLevel = pos === "K" || pos === "DEF";
+  const playersFor = ranks => {
+    if (teamLevel) return ranks.rows.map(r => ({t: r.t, avg: r.avg, label: `${r.t} ${pos === "DEF" ? "D/ST" : "K"}`, sub: pos === "K" ? ((D.kdef.K || []).find(k => k.team === r.t)?.name || "") : ""}));
+    const pool = D.players.filter(p => p.pos === pos && p.gp >= MIN_GP).slice(0, pos === "QB" || pos === "TE" ? 30 : 60);
+    return pool.map(p => ({p, t: p.team, avg: ranks.rows.find(r => r.t === p.team)?.avg ?? null})).filter(x => x.avg != null).sort((a, b) => b.avg - a.avg);
+  };
+  const list = (title, ranks, n) => {
+    const xs = playersFor(ranks), best = xs.slice(0, n), worst = xs.slice(-5).reverse();
+    const row = (x, i, rk) => `<div class="pl">${rnk(i)}${x.p ? head(x.p) : ""}<span class="grow">${x.p ? `<a href="#/p/${x.p.id}"><b>${esc(x.p.name)}</b></a>` : `<b>${esc(x.label)}</b>`} <span class="muted small">${x.p ? x.p.pos + " · " + x.t + " · " + f1(x.p.ppg) + " ppg" : esc(x.sub || "")}</span><br><span class="muted tiny">${rankWords(rk, ranks.n, pos, title.includes("playoff") ? "playoff schedule" : "schedule ROS")} · opponents allow ${f1(x.avg)}/g</span></span>${easeTag(x.avg, pos)}</div>`;
+    return `<h2>${title}</h2><div class="card list">${best.map((x, i) => row(x, i, ranks.rank[x.t])).join("")}</div>
+      <p class="small muted" style="margin:8px 0 2px">Toughest (watch out):</p><div class="card list">${worst.map((x, i) => row(x, xs.length - 1 - i, ranks.rank[x.t])).join("")}</div>`;
+  };
+  return `<div class="pick" style="margin:8px 0"><input id="sched-q" placeholder="Search a player's schedule…" autocomplete="off"><div class="sugg" hidden></div></div>
+  ${one}
+  <p class="muted small">Easy / Avg / Hard compares what each opponent allows to ${pos === "DEF" ? "defenses" : pos + "s"} with the league average (8% either way). Weeks 15–17 are the fantasy playoffs.</p>
+  <div class="cols"><div class="col">${list(`Best rest-of-season schedules (wk ${wk}–${LAST_FANTASY_WEEK})`, ros, 15)}</div><div class="col">${list("Best playoff schedules (wk 15–17)", po, 15)}</div></div>`;
+}
 function matchupGrid(pos) {
   const wk0 = nextWeek(), wks = []; for (let w = wk0; w <= LAST_FANTASY_WEEK; w++) wks.push(w);
   const vals = Object.values(D.teams.dvp).map(x => x[pos]).filter(v => v != null).sort((a, b) => a - b);
@@ -383,7 +434,7 @@ V.home = () => {
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
   const mxPos = pos === "FLEX" ? "RB" : pos;
   const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
-  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + matchupGrid(mxPos) : posSeg + (view === "ros" ? rosList(pos) : ppgList(pos))}${stamp()}`;
+  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + (view === "ros" ? rosList(pos) : ppgList(pos))}${stamp()}`;
 };
 function ppgList(pos) {
   const n = LIST_LEN[pos];
@@ -615,27 +666,36 @@ function rosterTag() {
 }
 
 /* ---- waivers ---- */
+function ownMax() { try { return +(localStorage.getItem("ownMax") || 60); } catch { return 60; } }
+function ownBadge(o) {
+  if (o == null) return "";
+  return `<span class="badge" title="Rostered in ${o.toFixed(1)}% of ESPN leagues">${o < 10 ? o.toFixed(1) : o.toFixed(0)}% rostered</span>`;
+}
 V.waivers = () => {
   setTab("waivers");
   const W = D.waivers || {players: []};
   const hide = V.wHide, posF = V.wPos || "ALL";
   const mine = new Set(roster());
+  const maxOwn = ownMax();
   let list = W.players.filter(e => BY[e.id]);
+  const hidden = list.filter(e => e.own != null && e.own > maxOwn).length;
+  list = list.filter(e => e.own == null || e.own <= maxOwn);
   if (hide) list = list.filter(e => !mine.has(e.id));
   if (posF !== "ALL") list = list.filter(e => e.pos === posF);
   const card = (e, i) => {
     const p = BY[e.id];
     const st = e.starter ? `<div class="small ink2" style="margin-top:4px">${e.starter.news ? `News on ${esc(e.starter.name)}: ${esc(e.starter.news.head)} <span class="muted">(${when(e.starter.news.t)})</span>` : ""}</div>` : "";
-    return `<div class="card wv">${rnk(i)}<div class="grow"><div class="row wrap" style="gap:6px"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a><span class="muted small">${p.pos} · ${p.team}</span>${injBadge(p)}${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}${e.type !== "jump" ? '<span class="sig buy">NEXT MAN UP</span>' : ""}</div>
+    return `<div class="card wv">${rnk(i)}<div class="grow"><div class="row wrap" style="gap:6px"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a><span class="muted small">${p.pos} · ${p.team}</span>${ownBadge(e.own)}${injBadge(p)}${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}${e.type !== "jump" ? '<span class="sig buy">NEXT MAN UP</span>' : ""}</div>
       <ul class="why">${e.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>${st}
       ${e.news ? `<div class="tiny muted" style="margin-top:4px">Latest: ${esc(e.news.head)} (${when(e.news.t)}, ${esc(e.news.src)})</div>` : ""}</div>
       <div class="proj"><b>+${f1(e.gain)}</b><span class="muted tiny">opps gained</span>${e.trend ? `<div class="tiny muted" style="margin-top:4px">${e.trend.toLocaleString()} adds (48h, Sleeper)</div>` : ""}<div class="tiny muted">${f1(e.ppg)} ppg</div></div></div>`;
   };
-  return `<h1>Waivers</h1><p class="muted small">Week ${W.week}: usage jumps from last week vs the 3 before (snap %, target share, carries, opportunity share), plus backups moving up behind an injured starter. Ranked by opportunities gained. Players already scoring 15+ a game, or who are out, are left off. Updated ${ago(W.updated)}.</p>
+  return `<h1>Waivers</h1><p class="muted small">Week ${W.week}: usage jumps from last week vs the 3 before (snap %, target share, carries, opportunity share), plus backups moving up behind an injured starter. Ranked by opportunities gained. Only players rostered in ${maxOwn}% of leagues or fewer (ESPN roster %); ${hidden} more are hidden as likely taken. Players who are out are left off. Updated ${ago(W.updated)}.</p>
   <div class="seg">${["ALL","RB","WR","TE"].map(x => `<button class="chip ${x === posF ? "on" : ""}" data-wpos="${x}">${x === "ALL" ? "All" : x}</button>`).join("")}<button class="chip ${hide ? "on" : ""}" data-act="whide">${hide ? "✓ " : ""}Hide my roster</button></div>
+  <div class="seg"><span class="muted small" style="align-self:center">Max rostered:</span>${[30, 45, 60, 75, 100].map(x => `<button class="chip ${x === maxOwn ? "on" : ""}" data-own="${x}">${x === 100 ? "Any" : x + "%"}</button>`).join("")}</div>
   <div class="only-narrow">${list.slice(0, 60).map(card).join("") || '<p class="muted">Nothing flagged yet.</p>'}</div>
-  <div class="only-wide card"><table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Opps gained</th><th>Why</th><th>Adds 48h</th><th>PPG</th></tr></thead><tbody>
-  ${list.slice(0, 60).map((e, i) => { const p = BY[e.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)} ${mine.has(e.id) ? '<span class="badge">mine</span>' : ""}</td><td>${p.pos}</td><td>${p.team}</td><td><b>+${f1(e.gain)}</b></td><td class="wrapcell">${e.reasons.map(esc).join("<br>")}${e.starter?.news ? `<br><span class="muted">News: ${esc(e.starter.news.head)}</span>` : ""}</td><td>${e.trend ? e.trend.toLocaleString() : "–"}</td><td>${f1(e.ppg)}</td></tr>`; }).join("")}</tbody></table></div>
+  <div class="only-wide card"><table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Rostered</th><th>Opps gained</th><th>Why</th><th>Adds 48h</th><th>PPG</th></tr></thead><tbody>
+  ${list.slice(0, 60).map((e, i) => { const p = BY[e.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)} ${mine.has(e.id) ? '<span class="badge">mine</span>' : ""}</td><td>${p.pos}</td><td>${p.team}</td><td>${e.own == null ? "–" : e.own.toFixed(0) + "%"}</td><td><b>+${f1(e.gain)}</b></td><td class="wrapcell">${e.reasons.map(esc).join("<br>")}${e.starter?.news ? `<br><span class="muted">News: ${esc(e.starter.news.head)}</span>` : ""}</td><td>${e.trend ? e.trend.toLocaleString() : "–"}</td><td>${f1(e.ppg)}</td></tr>`; }).join("")}</tbody></table></div>
   <p class="note">Route share isn't in the free data, so snap % and target share stand in for it.</p>`;
 };
 
@@ -929,6 +989,8 @@ function render() {
   else html = V.home();
   $("#app").innerHTML = html;
   ["give", "get", "rIds"].forEach(wirePicker);
+  const sq = $("#sched-q");
+  if (sq) attachSearch(sq, sq.nextElementSibling, p => { V.schedP = p.id; if (["QB","RB","WR","TE"].includes(p.pos)) V.home.pos = p.pos; render(); });
   document.querySelectorAll(".ss-slot").forEach(inp => attachSearch(inp, inp.nextElementSibling, p => {
     if (!V.ssIds.includes(p.id)) V.ssIds.push(p.id);
     render(); setTimeout(() => document.querySelector(".ss-slot")?.focus(), 0);
@@ -940,12 +1002,13 @@ let lastHash = "";
 window.addEventListener("hashchange", () => { if (location.hash.split("/")[1] !== lastHash.split("/")[1] || location.hash.startsWith("#/p") || location.hash.startsWith("#/c")) scrollTo(0, 0); lastHash = location.hash; render(); });
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-ssg],[data-mxs],[data-wpos]");
+  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-ssg],[data-mxs],[data-wpos],[data-own],[data-sched]");
   if (!t) return;
   if (t.dataset.pos) { V.home.pos = t.dataset.pos; render(); return; }
   if (t.dataset.view) { V.home.view = t.dataset.view; render(); return; }
   if (t.dataset.mxs) { V.mx = {sort: t.dataset.mxs}; render(); return; }
   if (t.dataset.wpos) { V.wPos = t.dataset.wpos; render(); return; }
+  if (t.dataset.own) { try { localStorage.setItem("ownMax", t.dataset.own); } catch {} render(); return; }
   if (t.dataset.theme) { try { localStorage.setItem("theme", t.dataset.theme); } catch {} document.documentElement.dataset.look = t.dataset.theme; render(); window.dispatchEvent(new Event("resize")); document.dispatchEvent(new Event("visibilitychange")); return; }
   if (t.dataset.nf) { V.news.f = t.dataset.nf; render(); return; }
   if (t.dataset.rm) { V[t.dataset.rm] = V[t.dataset.rm].filter(x => x !== t.dataset.id); if (t.dataset.rm === "rIds") setRoster(V.rIds); render(); return; }
