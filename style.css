@@ -128,3 +128,76 @@ td.fx{text-decoration:underline dotted var(--warn);text-underline-offset:3px}
 :root[data-look="gameday"] .card{background:linear-gradient(180deg,var(--panel),#0c1424);border-color:var(--line)}
 :root[data-look="gameday"] .room tr.me td{background:#211a44}
 :root[data-look="gameday"] .ana h3{background:none;color:var(--acc);-webkit-background-clip:initial;background-clip:initial}
+
+/* ======================= Round 5: charts, grid, waivers, responsive ======================= */
+.tabs a{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;padding:8px 2px;min-height:52px;justify-content:center}
+.tabs .ic{font-size:17px;line-height:1}
+.chip{min-height:36px}
+.charts{display:grid;grid-template-columns:1fr;gap:8px}
+.chart{margin:0;background:var(--panel2);border-radius:12px;padding:8px 10px 2px}
+.chart figcaption{font-size:12px;color:var(--ink2);display:flex;justify-content:space-between}
+.chart figcaption b{color:var(--ink)}
+.chart svg{width:100%;height:auto;display:block}
+.chart .cg{stroke:var(--line);stroke-width:1}
+.chart .ct{fill:var(--muted);font-size:9px}
+.chart .cl{fill:none;stroke:#a78bfa;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .cd{fill:#a78bfa;stroke:var(--panel2);stroke-width:2}
+.chart .pt:hover .cd{r:6}
+.wkcards{display:grid;gap:6px}
+.wkc,.roomc{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.roomc{margin:6px 0}.roomc.me{outline:1px solid #7c3aed}
+.wv{display:flex;gap:10px;align-items:flex-start}
+.wrapcell{white-space:normal!important;text-align:left!important;min-width:260px;line-height:1.35}
+table.rt td,table.rt th{font-size:13px}
+table.rt td:nth-child(2),table.rt th:nth-child(2){text-align:left}
+.grid-wrap{border:0}
+table.mx{font-size:10px;table-layout:fixed;width:100%}
+table.mx th,table.mx td{padding:5px 1px;text-align:center;font-size:10px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--ink)}
+table.mx td:first-child,table.mx th:first-child{text-align:left;padding-left:4px;width:38px;background:var(--panel)}
+table.mx td.bye{color:var(--muted);background:transparent}
+table.mx th.po{color:var(--gold,#f5c542)}
+table.mx td.po{box-shadow:inset 0 2px 0 rgba(245,197,66,.55),inset 0 -2px 0 rgba(245,197,66,.55)}
+.legend{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);margin:8px 0}
+.legend i{width:22px;height:10px;border-radius:3px;display:inline-block}
+.only-wide{display:none}
+.cols{display:block}
+
+@media (min-width:1024px){
+  main{max-width:1280px;padding:18px 28px 60px}
+  .top{padding-left:max(28px,calc((100vw - 1280px)/2 + 28px));padding-right:max(28px,calc((100vw - 1280px)/2 + 28px))}
+  .tabs{position:sticky;top:61px;bottom:auto;max-width:1280px;margin:0 auto;border-top:0;border-bottom:1px solid var(--line);padding:0 20px;justify-content:flex-start;gap:4px}
+  .tabs a{flex:none;flex-direction:row;gap:7px;font-size:14px;padding:12px 16px;min-height:0}
+  .tabs .ic{font-size:15px}
+  .only-wide{display:block}.only-narrow{display:none}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;align-items:start}
+  .cols .span{grid-column:1/-1}
+  .charts{grid-template-columns:1fr 1fr}
+  .news-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  table.mx th,table.mx td{font-size:12px;padding:7px 3px}
+  table.mx td:first-child,table.mx th:first-child{width:60px}
+  .sides{grid-template-columns:1fr 1fr}
+  .ana{max-width:none}
+  .toast{bottom:30px}
+}
+
+/* ======================= Round 6: the field ======================= */
+html{background:#0b2a18}
+body{background:transparent!important}
+#field{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:block}
+#playcap{position:fixed;left:12px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:5;font-size:11px;color:rgba(255,255,255,.55);background:rgba(7,12,24,.45);padding:3px 8px;border-radius:8px;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+@media (min-width:1024px){#playcap{bottom:14px;left:16px;font-size:12px}}
+:root[data-look="gameday"] .top{background:rgba(7,12,24,.78)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:3px solid #7c3aed}
+:root[data-look="gameday"] .tabs{background:rgba(7,12,24,.84);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+:root[data-look="gameday"] .card,:root[data-look="gameday"] .ana,:root[data-look="gameday"] .scroll,:root[data-look="gameday"] .subtabs{background:rgba(12,19,36,.80);backdrop-filter:blur(8px) saturate(115%);-webkit-backdrop-filter:blur(8px) saturate(115%)}
+:root[data-look="gameday"] .ana{background:linear-gradient(rgba(12,19,36,.86),rgba(12,19,36,.86)) padding-box,var(--grad) border-box}
+:root[data-look="gameday"] .tile,:root[data-look="gameday"] .wkc,:root[data-look="gameday"] .roomc,:root[data-look="gameday"] .chart{background:rgba(23,33,58,.82)}
+:root[data-look="gameday"] th,:root[data-look="gameday"] td:first-child,:root[data-look="gameday"] table.mx td:first-child{background:rgba(12,19,36,.92)}
+:root[data-look="gameday"] h1,:root[data-look="gameday"] h2,:root[data-look="gameday"] .note,:root[data-look="gameday"] #app>p{text-shadow:0 1px 3px rgba(0,0,0,.9)}
+:root[data-look="gameday"] #app>p.muted,:root[data-look="gameday"] #app>p.note{background:rgba(7,12,24,.55);padding:6px 10px;border-radius:8px}
+:root[data-look="gameday"] .chip{background:rgba(23,33,58,.88)}
+:root[data-look="classic"] #field,:root[data-look="classic"] #playcap{display:none}
+:root[data-look="classic"] body{background:var(--bg)!important}
+.wv .proj{margin-left:auto;text-align:right;flex:none}.wv .proj b{display:block;font-size:20px}
+.rt .rk{display:inline-block;width:26px}
+@media (max-width:1023px){table.mx .at{display:none}table.mx td,table.mx th{font-size:9.5px;letter-spacing:-.2px;padding:6px 0}}
+.only-narrow-inline{display:inline}@media(min-width:1024px){.only-narrow-inline{display:none}}

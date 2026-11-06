@@ -244,6 +244,126 @@ function ros(id) {
   return {id, p, S, base, usageF, sh, sh4, games: games.length, miss, sos, roomAdj: room.adj, roomNotes: room.notes, total};
 }
 
+/* ---------------- lucky or real (no Claude) ---------------- */
+let POSEFF = null;
+function posEff() {
+  if (POSEFF) return POSEFF;
+  const t = {};
+  for (const p of D.players) {
+    const ws = weeks(p.id); if (!ws.length) continue;
+    const x = t[p.pos] || (t[p.pos] = {car: 0, ryd: 0, tgt: 0, recyd: 0});
+    x.car += sum(ws, "car"); x.ryd += sum(ws, "ryd"); x.tgt += sum(ws, "tgt"); x.recyd += sum(ws, "recyd");
+  }
+  POSEFF = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, {ypc: v.car ? v.ryd / v.car : 0, ypt: v.tgt ? v.recyd / v.tgt : 0}]));
+  return POSEFF;
+}
+/* Expected TDs come from where his carries and targets happened (league TD rate from each spot on the field). */
+function luck(id) {
+  const p = BY[id], L = (D.luck.players || {})[id];
+  if (!p || !L) return null;
+  const [xtd, td] = L, S = summary(id), eff = posEff()[p.pos] || {};
+  const flags = [];
+  const diff = td - xtd;
+  if (diff >= 2.5 && td >= xtd * 1.5) flags.push({k: "hot", t: `Running hot: ${td} TDs vs ${xtd.toFixed(1)} expected from his usage. Expect fewer; sell-high candidate.`});
+  else if (diff <= -2.5) flags.push({k: "due", t: `Due: ${td} TDs vs ${xtd.toFixed(1)} expected from his red-zone and goal-line work. TDs should come; buy-low candidate.`});
+  if (p.pos === "RB" && S.s.car >= 60 && eff.ypc) {
+    const d = S.s.ypc - eff.ypc;
+    if (d >= 1) flags.push({k: "hot", t: `Efficiency hot: ${S.s.ypc.toFixed(1)} yds/carry vs ${eff.ypc.toFixed(1)} for RBs. Hard to keep up.`});
+    else if (d <= -0.9) flags.push({k: "due", t: `Efficiency cold: ${S.s.ypc.toFixed(1)} yds/carry vs ${eff.ypc.toFixed(1)} for RBs. Volume is real; yards should rebound.`});
+  }
+  if ((p.pos === "WR" || p.pos === "TE") && S.s.tgt >= 35 && eff.ypt) {
+    const d = S.s.ypt - eff.ypt;
+    if (d >= 2.5) flags.push({k: "hot", t: `Efficiency hot: ${S.s.ypt.toFixed(1)} yds/target vs ${eff.ypt.toFixed(1)} for ${p.pos}s.`});
+    else if (d <= -2.2) flags.push({k: "due", t: `Efficiency cold: ${S.s.ypt.toFixed(1)} yds/target vs ${eff.ypt.toFixed(1)} for ${p.pos}s; the targets are there.`});
+  }
+  const tdFlag = flags.find(f => f.t.startsWith("Running") || f.t.startsWith("Due"));
+  return {xtd, td, flags, tag: tdFlag ? tdFlag.k : (flags[0] ? flags[0].k : null)};
+}
+function luckTag(id) {
+  const L = luck(id); if (!L || !L.tag) return "";
+  return L.tag === "hot" ? `<span class="sig sell" title="${esc(L.flags.map(f => f.t).join(" "))}">HOT · SELL</span>`
+                         : `<span class="sig buy" title="${esc(L.flags.map(f => f.t).join(" "))}">DUE · BUY</span>`;
+}
+
+/* ---------------- usage charts (inline SVG, one series each) ---------------- */
+function spark(title, pts, fmt, max) {
+  const W = 300, H = 92, padL = 30, padR = 8, padT = 10, padB = 20;
+  const vals = pts.map(p => p.v).filter(v => v != null);
+  const nice = v => v <= 1 ? Math.min(1, Math.ceil(v * 1.2 * 10) / 10) : Math.ceil(v * 1.15 / 5) * 5;
+  const top = max || nice(Math.max(0.05, ...vals));
+  const x = i => padL + (pts.length < 2 ? (W - padL - padR) / 2 : i * (W - padL - padR) / (pts.length - 1));
+  const y = v => padT + (H - padT - padB) * (1 - v / top);
+  let path = "", started = false;
+  pts.forEach((p, i) => { if (p.v == null) { started = false; return; } path += (started ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1) + " "; started = true; });
+  const grid = [0, 0.5, 1].map(f => `<line x1="${padL}" x2="${W - padR}" y1="${y(top * f)}" y2="${y(top * f)}" class="cg"/><text x="${padL - 4}" y="${y(top * f) + 3}" class="ct" text-anchor="end">${fmt(top * f)}</text>`).join("");
+  const dots = pts.map((p, i) => p.v == null ? `<text x="${x(i)}" y="${y(0) - 4}" class="ct" text-anchor="middle">–</text>` :
+    `<g class="pt"><circle cx="${x(i)}" cy="${y(p.v)}" r="12" fill="transparent"/><circle cx="${x(i)}" cy="${y(p.v)}" r="4" class="cd"/><title>Wk ${p.wk}${p.opp ? " vs " + p.opp : ""}: ${fmt(p.v)}</title></g>`).join("");
+  const last = [...pts].reverse().find(p => p.v != null);
+  const xl = pts.map((p, i) => `<text x="${x(i)}" y="${H - 5}" class="ct" text-anchor="middle">${p.wk}</text>`).join("");
+  return `<figure class="chart"><figcaption>${title}${last ? ` <b>${fmt(last.v)}</b>` : ""}</figcaption>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title} by week">${grid}<path d="${path}" class="cl"/>${dots}${xl}</svg></figure>`;
+}
+function usageCharts(id) {
+  const p = BY[id]; if (!p || p.pos === "QB" && !weeks(id).length) return "";
+  const tg = teamGames(p.team).slice(-6), ws = weeks(id);
+  const row = wk => ws.find(w => w.wk === wk);
+  const pts = f => tg.map(wk => { const w = row(wk); return {wk, opp: w?.opp, v: w ? f(w) : null}; });
+  const P = v => Math.round(v * 100) + "%";
+  const charts = [spark("Snap %", pts(w => w.snp / 100), P, 1)];
+  if (p.pos === "QB") charts.push(spark("Pass attempts", pts(w => w.att), v => Math.round(v)), spark("Rush attempts", pts(w => w.car), v => Math.round(v)));
+  else {
+    charts.push(spark("Target share", pts(w => w.tmt ? w.tgt / w.tmt : 0), P, null));
+    if (p.pos === "RB") charts.push(spark("Rush share", pts(w => w.tmc ? w.car / w.tmc : 0), P, 1), spark("Carries", pts(w => w.car), v => Math.round(v)));
+    else charts.push(spark("Carries", pts(w => w.car), v => Math.round(v)));
+  }
+  return `<h2>Usage · last ${tg.length} team games</h2><div class="charts">${charts.join("")}</div>`;
+}
+
+/* ---------------- matchups ---------------- */
+function buildKDefDvp() {
+  // points allowed to kickers (by defense) and points defenses score against each offense
+  const add = (map, team, v) => { const x = map[team] || (map[team] = [0, 0]); x[0] += v; x[1]++; };
+  const k = {}, d = {};
+  for (const K of D.kdef.K || []) for (const [wk, opp, pts] of K.weeks || []) add(k, opp, pts);
+  for (const X of D.kdef.DEF || []) for (const [wk, opp, pts] of X.weeks || []) add(d, opp, pts);
+  for (const [t, v] of Object.entries(k)) (D.teams.dvp[t] = D.teams.dvp[t] || {}).K = Math.round(v[0] / v[1] * 10) / 10;
+  for (const [t, v] of Object.entries(d)) (D.teams.dvp[t] = D.teams.dvp[t] || {}).DEF = Math.round(v[0] / v[1] * 10) / 10;
+  for (const pos of ["K", "DEF"]) {
+    const vals = Object.values(D.teams.dvp).map(x => x[pos]).filter(v => v != null);
+    D.teams.league[pos] = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : 0;
+  }
+}
+function heat(v, lo, hi) {
+  // sequential diverging-free scale: tough (low) → easy (high), one purple-to-green ramp, text stays ink
+  if (v == null) return "";
+  const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo || 1)));
+  const stops = ["#5b1f2a", "#6b3a2a", "#3a3f55", "#2a5a3c", "#1f7a45"];
+  return stops[Math.min(4, Math.floor(t * 5))];
+}
+function matchupGrid(pos) {
+  const wk0 = nextWeek(), wks = []; for (let w = wk0; w <= LAST_FANTASY_WEEK; w++) wks.push(w);
+  const vals = Object.values(D.teams.dvp).map(x => x[pos]).filter(v => v != null).sort((a, b) => a - b);
+  const lo = vals[Math.floor(vals.length * 0.1)] ?? 0, hi = vals[Math.floor(vals.length * 0.9)] ?? 1;
+  const teams = Object.keys(D.teams.sched).sort();
+  const rowsAll = teams.map(t => {
+    const sch = D.teams.sched[t];
+    const cells = wks.map(w => { const g = sch.find(x => x[0] === w); if (!g) return {bye: true}; const v = (D.teams.dvp[g[1]] || {})[pos]; return {opp: g[1], home: g[2], v}; });
+    const play = cells.filter(c => !c.bye && c.v != null), po = cells.filter((c, i) => wks[i] >= 15 && !c.bye && c.v != null);
+    const avg = a => a.length ? a.reduce((s, c) => s + c.v, 0) / a.length : 0;
+    return {t, cells, ros: avg(play), po: avg(po)};
+  });
+  const sortBy = V.mx?.sort || "ros";
+  rowsAll.sort((a, b) => b[sortBy] - a[sortBy]);
+  return `<p class="muted small">Each team's remaining opponents, colored by half-PPR points those defenses allow to ${pos === "DEF" ? "defenses (how generous each offense is)" : pos + "s"}. Green = easy, red = tough. Weeks 15–17 (gold) are the fantasy playoffs.</p>
+  <div class="seg"><span class="muted small" style="align-self:center">Sort:</span><button class="chip ${sortBy === "ros" ? "on" : ""}" data-mxs="ros">Rest of season</button><button class="chip ${sortBy === "po" ? "on" : ""}" data-mxs="po">Playoffs (15–17)</button></div>
+  <div class="scroll grid-wrap"><table class="mx"><thead><tr><th>Team</th>${wks.map(w => `<th class="${w >= 15 ? "po" : ""}">${w}</th>`).join("")}<th>ROS</th><th class="po">PO</th></tr></thead><tbody>
+  ${rowsAll.map(r => `<tr><td><b>${r.t}</b></td>${r.cells.map((c, i) => c.bye ? `<td class="bye ${wks[i] >= 15 ? "po" : ""}">BYE</td>` :
+    `<td class="${wks[i] >= 15 ? "po" : ""}" style="background:${heat(c.v, lo, hi)}" title="${c.home ? "vs" : "@"} ${c.opp}: allows ${c.v == null ? "?" : f1(c.v)}">${c.home ? "" : '<span class="at">@</span>'}${c.opp}</td>`).join("")}
+    <td>${f1(r.ros)}</td><td class="po">${f1(r.po)}</td></tr>`).join("")}
+  </tbody></table></div>
+  <div class="legend"><span>Tough</span>${["#5b1f2a", "#6b3a2a", "#3a3f55", "#2a5a3c", "#1f7a45"].map(c => `<i style="background:${c}"></i>`).join("")}<span>Easy</span></div>`;
+}
+
 /* ---------------- views ---------------- */
 const V = {};
 function setTab(t) { document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === t)); }
@@ -259,9 +379,11 @@ V.home = () => {
   setTab("home");
   const view = V.home.view || "ppg";
   const pos = V.home.pos || "RB";
-  const sub = `<div class="subtabs"><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button></div>`;
+  const sub = `<div class="subtabs"><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Matchups</button></div>`;
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
-  return `<h1>Rankings</h1>${sub}${posSeg}${view === "ros" ? rosList(pos) : ppgList(pos)}${stamp()}`;
+  const mxPos = pos === "FLEX" ? "RB" : pos;
+  const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
+  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + matchupGrid(mxPos) : posSeg + (view === "ros" ? rosList(pos) : ppgList(pos))}${stamp()}`;
 };
 function ppgList(pos) {
   const n = LIST_LEN[pos];
@@ -270,12 +392,17 @@ function ppgList(pos) {
   else if (pos === "DEF") list = (D.kdef.DEF || []).slice(0, n).map(defRow).join("");
   else {
     const ok = pos === "FLEX" ? (p => p.pos === "RB" || p.pos === "WR" || p.pos === "TE") : (p => p.pos === pos);
-    list = D.players.filter(p => ok(p) && p.gp >= MIN_GP).slice(0, n).map((p, i) => plRow(p, i)).join("");
+    const ps = D.players.filter(p => ok(p) && p.gp >= MIN_GP).slice(0, n);
+    list = `<div class="only-narrow">${ps.map((p, i) => plRow(p, i)).join("")}</div>` + `<div class="only-wide">${ppgTable(ps)}</div>`;
   }
   const note = pos === "K" ? "Kickers: FG 0–39 = 3, 40–49 = 4, 50+ = 5, PAT = 1."
     : pos === "DEF" ? "Defenses: sack 1, INT / fumble rec / safety / block 2, TD 6, plus points-allowed tiers (0 = 10 … 35+ = −4)." : "";
   return `<p class="muted small">Half-PPR points per game · top ${n} · at least ${MIN_GP} games played.</p>
   <div class="card list">${list || '<p class="muted">No data yet.</p>'}</div>${note ? `<p class="note">${note}</p>` : ""}`;
+}
+function ppgTable(ps) {
+  return `<table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>GP</th><th>PPG</th><th>Snap%</th><th>Car/g</th><th>Tgt/g</th><th>Share</th><th>RZ/g</th><th>TD</th><th>xTD</th><th>Flag</th></tr></thead><tbody>
+  ${ps.map((p, i) => { const S = summary(p.id), a = S.s, L = (D.luck.players || {})[p.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)}</td><td>${p.pos}</td><td>${p.team}</td><td>${p.gp}</td><td><b>${f1(p.ppg)}</b></td><td>${pct(a.snp)}</td><td>${f1(a.car / a.g)}</td><td>${f1(a.tgt / a.g)}</td><td>${p.pos === "QB" ? "–" : pct(share(p.pos, a))}</td><td>${f1(a.rz / a.g)}</td><td>${a.rtd + a.rectd + (p.pos === "QB" ? a.ptd : 0)}</td><td>${L ? L[0].toFixed(1) : "–"}</td><td>${luckTag(p.id)}</td></tr>`; }).join("")}</tbody></table>`;
 }
 function kRow(k, i) {
   return `<div class="pl">${rnk(i)}${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · ${k.gp} gp · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
@@ -331,7 +458,7 @@ function rosList(pos) {
   <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
 }
 function plRow(p, i) {
-  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
+  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)} ${typeof i === "number" ? luckTag(p.id) : ""}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
 }
 
 function statTiles(p, a, n) {
@@ -345,6 +472,11 @@ function statTiles(p, a, n) {
   return `<div class="tiles">${h}</div>`;
 }
 
+function weekCards(p, ws) {
+  const qb = p.pos === "QB";
+  return `<div class="wkcards">${ws.slice().reverse().map(w => `<div class="wkc"><div class="row"><b>Wk ${w.wk}</b><span class="muted small">${w.team !== p.team ? w.team + " " : ""}vs ${w.opp}</span><b style="margin-left:auto">${f1(w.pts)}</b><span class="muted tiny">pts</span></div>
+    <div class="small ink2">${w.snp ? w.snp + "% snaps · " : ""}${qb ? `${w.cmp}/${w.att}, ${w.pyd} yds, ${w.ptd} TD, ${w.int} INT · ` : ""}${w.car ? `${w.car} car, ${w.ryd} yds${w.rtd ? ", " + w.rtd + " TD" : ""}` : ""}${!qb && w.tgt ? `${w.car ? " · " : ""}${w.rec}/${w.tgt} tgt, ${w.recyd} yds${w.rectd ? ", " + w.rectd + " TD" : ""}` : ""}${w.rzc + w.rzt ? ` · RZ ${w.rzc + w.rzt}` : ""}${w.glc + w.glt ? ` · GL ${w.glc + w.glt}` : ""}${w.fix ? ' · <span title="Corrected to the ESPN box score">✓ESPN</span>' : ""}</div></div>`).join("")}</div>`;
+}
 function weekTable(p, ws) {
   const qb = p.pos === "QB";
   const cols = qb
@@ -366,8 +498,10 @@ function roomTable(id) {
   const label = p.pos === "RB" ? "Backfield" : p.pos === "WR" ? "WR room" : "TE room";
   const rows = R.mates.slice(0, 6);
   const maxSh = Math.max(0.01, ...rows.map(m => share(p.pos, m.l4) || 0));
-  return `<h2>${label} · ${p.team}</h2>
-  <div class="scroll"><table class="room"><thead><tr><th>Player</th><th>Status</th><th>${p.pos === "RB" ? "Opp" : "Tgt"} share L4</th><th></th><th>Season</th><th>Car L4</th><th>Tgt L4</th><th>RZ L4</th><th>GL L4</th><th>Snap% L4</th></tr></thead><tbody>
+  const cards = `<div class="only-narrow">${rows.map(m => { const s4 = share(p.pos, m.l4) || 0; return `<div class="roomc ${m.q.id === id ? "me" : ""}"><div class="row"><a href="#/p/${m.q.id}"><b>${esc(m.q.name)}</b></a>${m.q.inj ? injBadge(m.q) : m.missedLast && m.ws.length ? '<span class="badge">missed last game</span>' : ""}<b style="margin-left:auto">${pct(s4)}</b></div>
+    <div class="meter" style="margin:5px 0"><i style="width:${(s4 / maxSh * 100).toFixed(0)}%"></i></div><div class="tiny muted">Last 4: ${m.l4.car} car · ${m.l4.tgt} tgt · RZ ${m.l4.rz} · GL ${m.l4.gl} · ${m.l4.g ? pct(m.l4.snp) + " snaps" : "–"} · season share ${pct(share(p.pos, m.s))}</div></div>`; }).join("")}</div>`;
+  return `<h2>${label} · ${p.team}</h2>${cards}
+  <div class="scroll only-wide"><table class="room"><thead><tr><th>Player</th><th>Status</th><th>${p.pos === "RB" ? "Opp" : "Tgt"} share L4</th><th></th><th>Season</th><th>Car L4</th><th>Tgt L4</th><th>RZ L4</th><th>GL L4</th><th>Snap% L4</th></tr></thead><tbody>
   ${rows.map(m => { const s4 = share(p.pos, m.l4) || 0; return `<tr class="${m.q.id === id ? "me" : ""}">
     <td><a href="#/p/${m.q.id}">${esc(m.q.name)}</a></td><td>${m.q.inj ? injBadge(m.q) : m.missedLast && m.ws.length ? '<span class="badge">missed last game</span>' : "–"}</td>
     <td>${pct(s4)}</td><td><div class="meter" role="img" aria-label="${pct(s4)}"><i style="width:${(s4 / maxSh * 100).toFixed(0)}%"></i></div></td>
@@ -417,12 +551,80 @@ V.player = id => {
     <button class="btn ghost" data-act="mine" data-id="${id}">${mine ? "✓ On my roster" : "+ My roster"}</button>
   </div>
   ${p.injn ? `<p class="small ink2">${esc(p.injn)}</p>` : ""}
+  <div id="nums" class="cols">
+  <div class="col">
   <h2>Season · ${S.gp} games</h2>${S.gp ? statTiles(p, S.s) : `<p class="muted">No stats yet this season.</p>`}
   ${S.l4gp ? `<h2>Last ${S.l4gp} games</h2>${statTiles(p, L4)}` : ""}
-  ${S.gp ? `<h2>Week by week</h2>${weekTable(p, S.ws)}` : ""}
+  ${luckBlock(id)}
+  ${S.gp ? outlookBlock(id) : ""}
+  </div>
+  <div class="col">
+  ${S.gp ? usageCharts(id) : ""}
   ${roomTable(id)}
   <h2>Latest news</h2>${newsFor(id)}
+  </div>
+  <div class="span">${S.gp ? `<h2>Week by week</h2><div class="only-wide">${weekTable(p, S.ws)}</div><div class="only-narrow">${weekCards(p, S.ws)}</div>` : ""}</div>
+  </div>
+  ${S.gp ? anaPanel("profile", [id], true) : ""}
   ${stamp()}`;
+};
+
+function luckBlock(id) {
+  const L = luck(id); if (!L) return "";
+  const tdLine = `<b style="color:var(--ink)">${L.td}</b> TDs vs <b style="color:var(--ink)">${L.xtd.toFixed(1)}</b> expected from where his carries and targets came (league TD rate from each spot on the field).`;
+  return `<h2>Lucky or real</h2><div class="card small ink2">${tdLine}${L.flags.length ? `<ul class="why">${L.flags.map(f => `<li class="${f.k === "hot" ? "v-bad" : "v-good"}">${esc(f.t)}</li>`).join("")}</ul>` : `<div style="margin-top:4px">Nothing unusual: his scoring matches his usage.</div>`}</div>`;
+}
+function byeWeek(team) {
+  const wks = new Set((D.teams.sched[team] || []).map(g => g[0]));
+  for (let w = 1; w <= 18; w++) if (!wks.has(w)) return w;
+  return null;
+}
+function outlookBlock(id) {
+  const R = ros(id), p = BY[id], up = nextGames(p.team, nextWeek()).slice(0, 4);
+  const opp = up.map(g => { const m = matchupFactor(g[1], p.pos); return `Wk ${g[0]} ${g[2] ? "vs" : "@"} ${g[1]} (${m.f > 1.03 ? "easy" : m.f < 0.97 ? "tough" : "neutral"})`; }).join(" · ");
+  return `<h2>Outlook</h2><div class="card small ink2">Rest of season: <b style="color:var(--ink)">${f1(R.total)}</b> projected half-PPR pts over ${R.games - R.miss} games (${f1(R.base)}/g, schedule ${R.sos.toFixed(2)}, usage trend ×${R.usageF.toFixed(2)}${R.roomAdj !== 1 ? `, room ×${R.roomAdj.toFixed(2)}` : ""}). Bye week ${byeWeek(p.team) ?? "–"}.<br>Next: ${opp || "–"}</div>`;
+}
+/* His roster, written out for the trade and start/sit write-ups (it never leaves his device otherwise). */
+function rosterContext(extraGive = [], extraGet = []) {
+  const ids = roster().filter(id => BY[id]);
+  if (!ids.length) return "";
+  const after = ids.filter(id => !extraGive.includes(id)).concat(extraGet.filter(id => !ids.includes(id)));
+  const line = list => ["QB", "RB", "WR", "TE"].map(pos => {
+    const ps = list.map(id => BY[id]).filter(p => p && p.pos === pos).sort((a, b) => b.ppg - a.ppg);
+    return `${pos} (${ps.length}): ` + (ps.map(p => `${p.name} ${p.team} ${f1(p.ppg)} ppg, ${(() => { const b = byeWeek(p.team); return b == null ? "bye ?" : b < nextWeek() ? `bye done (wk ${b})` : `bye wk ${b}`; })()}${p.inj ? ", " + p.inj : ""}`).join("; ") || "none");
+  }).join("\n");
+  return `<h2>Your roster</h2><div class="card small ink2" style="white-space:pre-line">${esc(line(ids))}</div>` +
+    (extraGive.length || extraGet.length ? `<h2>Your roster after the trade</h2><div class="card small ink2" style="white-space:pre-line">${esc(line(after))}</div>` : "");
+}
+function rosterTag() {
+  const r = roster().slice().sort().join(","); let h = 0;
+  for (const c of r) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return "r" + h.toString(36);
+}
+
+/* ---- waivers ---- */
+V.waivers = () => {
+  setTab("waivers");
+  const W = D.waivers || {players: []};
+  const hide = V.wHide, posF = V.wPos || "ALL";
+  const mine = new Set(roster());
+  let list = W.players.filter(e => BY[e.id]);
+  if (hide) list = list.filter(e => !mine.has(e.id));
+  if (posF !== "ALL") list = list.filter(e => e.pos === posF);
+  const card = (e, i) => {
+    const p = BY[e.id];
+    const st = e.starter ? `<div class="small ink2" style="margin-top:4px">${e.starter.news ? `News on ${esc(e.starter.name)}: ${esc(e.starter.news.head)} <span class="muted">(${when(e.starter.news.t)})</span>` : ""}</div>` : "";
+    return `<div class="card wv">${rnk(i)}<div class="grow"><div class="row wrap" style="gap:6px"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a><span class="muted small">${p.pos} · ${p.team}</span>${injBadge(p)}${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}${e.type !== "jump" ? '<span class="sig buy">NEXT MAN UP</span>' : ""}</div>
+      <ul class="why">${e.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>${st}
+      ${e.news ? `<div class="tiny muted" style="margin-top:4px">Latest: ${esc(e.news.head)} (${when(e.news.t)}, ${esc(e.news.src)})</div>` : ""}</div>
+      <div class="proj"><b>+${f1(e.gain)}</b><span class="muted tiny">opps gained</span>${e.trend ? `<div class="tiny muted" style="margin-top:4px">${e.trend.toLocaleString()} adds (48h, Sleeper)</div>` : ""}<div class="tiny muted">${f1(e.ppg)} ppg</div></div></div>`;
+  };
+  return `<h1>Waivers</h1><p class="muted small">Week ${W.week}: usage jumps from last week vs the 3 before (snap %, target share, carries, opportunity share), plus backups moving up behind an injured starter. Ranked by opportunities gained. Players already scoring 15+ a game, or who are out, are left off. Updated ${ago(W.updated)}.</p>
+  <div class="seg">${["ALL","RB","WR","TE"].map(x => `<button class="chip ${x === posF ? "on" : ""}" data-wpos="${x}">${x === "ALL" ? "All" : x}</button>`).join("")}<button class="chip ${hide ? "on" : ""}" data-act="whide">${hide ? "✓ " : ""}Hide my roster</button></div>
+  <div class="only-narrow">${list.slice(0, 60).map(card).join("") || '<p class="muted">Nothing flagged yet.</p>'}</div>
+  <div class="only-wide card"><table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Opps gained</th><th>Why</th><th>Adds 48h</th><th>PPG</th></tr></thead><tbody>
+  ${list.slice(0, 60).map((e, i) => { const p = BY[e.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)} ${mine.has(e.id) ? '<span class="badge">mine</span>' : ""}</td><td>${p.pos}</td><td>${p.team}</td><td><b>+${f1(e.gain)}</b></td><td class="wrapcell">${e.reasons.map(esc).join("<br>")}${e.starter?.news ? `<br><span class="muted">News: ${esc(e.starter.news.head)}</span>` : ""}</td><td>${e.trend ? e.trend.toLocaleString() : "–"}</td><td>${f1(e.ppg)}</td></tr>`; }).join("")}</tbody></table></div>
+  <p class="note">Route share isn't in the free data, so snap % and target share stand in for it.</p>`;
 };
 
 /* ---- compare ---- */
@@ -499,7 +701,7 @@ V.news = () => {
   return `<h1>News</h1>
   <p class="muted small">One card per player. A new report updates the card; repeats are folded in. Updated ${ago(D.news.updated)}.</p>
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
-  ${cards.slice(0, 120).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}`;
+  <div class="news-grid">${cards.slice(0, 120).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
 
 /* ---- start/sit ---- */
@@ -512,8 +714,18 @@ function wirePicker(key) {
   const i = $(`#pk-${key}`); if (!i) return;
   attachSearch(i, $(`#pks-${key}`), p => { if (!V[key].includes(p.id)) V[key].push(p.id); if (key === "rIds") setRoster(V.rIds); render(); setTimeout(() => $(`#pk-${key}`)?.focus(), 0); });
 }
+const SS_GROUPS = {QB: [["QB"], 1], RB: [["RB"], 2], WR: [["WR"], 2], TE: [["TE"], 1], FLEX: [["RB", "WR", "TE"], 6]};
+function ssFromRoster(g) {
+  const [poss, n] = SS_GROUPS[g], wk = nextWeek();
+  const ps = roster().map(id => BY[id]).filter(p => p && poss.includes(p.pos));
+  const ok = ps.filter(p => !OUT.has(p.inj) && byeWeek(p.team) !== wk);
+  V.ssOut = ps.filter(p => !ok.includes(p)).map(p => `${p.name} (${OUT.has(p.inj) ? p.inj : "bye"})`);
+  V.ssIds = ok.map(p => p.id); V.ssN = Math.min(n, Math.max(1, ok.length - 1)); V.ssGroup = g;
+  V.ssSlots = Math.max(3, V.ssIds.length);
+}
 V.ss = () => {
   setTab("ss");
+  if (V.ssIds === undefined && roster().length) ssFromRoster("FLEX");   // first visit: his own RB/WR/TE
   V.ssIds = (V.ssIds || []).filter(id => BY[id]);
   V.ssSlots = Math.max(3, V.ssSlots || 3, V.ssIds.length + (V.ssIds.length >= 3 ? 0 : 1));
   const n = V.ssIds.length;
@@ -530,19 +742,21 @@ V.ss = () => {
   if (n >= 2) {
     const res = V.ssIds.map(id => project(id, wk)).sort((x, y) => y.proj - x.proj);
     V.ssLast = {wk, res, start: V.ssN};
-    out = anaPanel("startsit", [...res.map(x => x.id), "start" + V.ssN], false) + `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
+    out = anaPanel("startsit", [...res.map(x => x.id), "start" + V.ssN, rosterTag()], false) + `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
       <div class="grow"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a> <span class="muted small">${x.p.pos} · ${x.p.team}</span> ${injBadge(x.p)}
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
       <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span><div class="tiny muted" style="margin-top:4px">${x.bye ? "" : `${f1(x.floor)}–${f1(x.ceil)}`}</div></div></div>`).join("") +
-      `</div><p class="note">Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. Projection = 60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
+      rosterContext() + `</div><p class="note">Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. Projection = 60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
       <button class="btn ghost" data-act="ask-ss">Ask the coach on Telegram</button>`;
   }
   return `<h1>Start / Sit</h1><p class="muted small">Add 3 or more players, any positions. It ranks them all like a FLEX call. Week ${wk}.</p>
+  ${roster().length ? `<div class="seg"><span class="muted small" style="align-self:center">From my roster:</span>${Object.keys(SS_GROUPS).map(g => `<button class="chip ${V.ssGroup === g ? "on" : ""}" data-ssg="${g}">My ${g === "FLEX" ? "RB/WR/TE" : g + "s"}</button>`).join("")}<button class="chip" data-act="ss-clear">Clear</button></div>` : ""}
+  ${V.ssOut && V.ssOut.length ? `<p class="small muted">Left out: ${esc(V.ssOut.join(", "))}</p>` : ""}
   <div class="card list">${slots.join("")}</div>
   <div class="row wrap" style="margin-top:8px"><button class="btn ghost sm" data-act="ss-add">+ Add player</button>
     ${n >= 2 ? `<span class="muted small" style="margin-left:6px">Slots to fill:</span>${Array.from({length: Math.max(1, n - 1)}, (_, i) => i + 1).map(k => `<button class="chip ${k === V.ssN ? "on" : ""}" data-ssn="${k}">${k}</button>`).join("")}` : ""}</div>
-  ${r.length ? `<p class="small muted" style="margin:10px 0 4px">From my roster:</p><div class="chips">${r.map(id => `<button class="chip" data-addss="${id}">+ ${esc(BY[id].name)}</button>`).join("")}</div>` : ""}
+  ${r.length ? `<p class="small muted" style="margin:10px 0 4px">Add one from my roster:</p><div class="chips">${r.map(id => `<button class="chip" data-addss="${id}">+ ${esc(BY[id].name)}</button>`).join("")}</div>` : ""}
   ${out}`;
 };
 
@@ -559,15 +773,18 @@ V.trade = () => {
       : pctd < -0.08 ? ["DECLINE", "v-bad", `You lose about ${f1(-diff)} points rest of season (${Math.round(pctd * 100)}%).`]
       : ["CLOSE CALL", "v-even", `Within 8% either way (${diff >= 0 ? "+" : ""}${f1(diff)} pts). Decide on roster need.`];
     V.tradeLast = {G, R, tg, tr, verdict};
-    const tbl = (xs, t) => `<h2>${t}</h2><div class="scroll"><table><thead><tr><th>Player</th><th>ROS pts</th><th>Per game</th><th>L4 ppg</th><th>Season ppg</th><th>Games left</th><th>Sched</th><th>Share L4</th><th>Room</th><th>Status</th></tr></thead><tbody>
+    const tcards = xs => `<div class="only-narrow">${xs.map(x => `<div class="card"><div class="row"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a><span class="muted small">${x.p.pos} · ${x.p.team}</span>${injBadge(x.p)}<b style="margin-left:auto">${f1(x.total)}</b><span class="muted tiny">ROS</span></div>
+      <div class="small ink2">${f1(x.base)}/g · L4 ${f1(x.S.l4.ppg)} · season ${f1(x.S.s.ppg)} · ${x.games - x.miss} games left${x.miss ? ` (−${x.miss})` : ""} · sched ${x.sos.toFixed(2)} · share ${pct(share(x.p.pos, x.S.l4))} · room ×${x.roomAdj.toFixed(2)}</div></div>`).join("")}</div>`;
+    const tbl = (xs, t) => `<h2>${t}</h2>${tcards(xs)}<div class="scroll only-wide"><table><thead><tr><th>Player</th><th>ROS pts</th><th>Per game</th><th>L4 ppg</th><th>Season ppg</th><th>Games left</th><th>Sched</th><th>Share L4</th><th>Room</th><th>Status</th></tr></thead><tbody>
       ${xs.map(x => `<tr><td><a href="#/p/${x.id}">${esc(x.p.name)}</a> <span class="muted">${x.p.pos}</span></td><td><b>${f1(x.total)}</b></td><td>${f1(x.base)}</td><td>${f1(x.S.l4.ppg)}</td><td>${f1(x.S.s.ppg)}</td><td>${x.games - x.miss}${x.miss ? ` <span class="muted">(-${x.miss})</span>` : ""}</td><td>${x.sos.toFixed(2)}</td><td>${pct(share(x.p.pos, x.S.l4))}</td><td>×${x.roomAdj.toFixed(2)}</td><td>${x.p.inj || "–"}</td></tr>`).join("")}
       <tr class="tot"><td>Total</td><td>${f1(xs.reduce((a, x) => a + x.total, 0))}</td><td colspan="8"></td></tr></tbody></table></div>
       ${xs.flatMap(x => x.roomNotes.map(n => `<p class="small ink2">• ${esc(n.t)}</p>`)).join("")}
       ${xs.map(x => newsLine(x.id)).filter(Boolean).map(t => `<p class="small ink2">• ${esc(t)}</p>`).join("")}`;
     out = `<div id="nums"><div class="card"><div class="verdict ${verdict[1]}">${verdict[0]}</div><div>${verdict[2]}</div>
       <div class="small muted" style="margin-top:4px">You give ${f1(tg)} · you get ${f1(tr)} projected half-PPR points through week ${LAST_FANTASY_WEEK}.</div></div>
-      ${tbl(G, "You give")}${tbl(R, "You get")}</div>
-      ${anaPanel("trade", [...V.give, "|", ...V.get], false)}
+      ${tbl(G, "You give")}${tbl(R, "You get")}
+      ${rosterContext(V.give, V.get) || `<p class="note">Add your players on the My Roster tab and the write-up will weigh positional need, depth and byes.</p>`}</div>
+      ${anaPanel("trade", [...V.give, "|", ...V.get, rosterTag()], false)}
       <p class="note">ROS points = per-game value (75% season + 25% last 4, × usage trend: last-4 share vs season, half weight) × each remaining opponent's points allowed to the position (half weight) × room changes, minus games lost to injury (IR = 4 weeks, Out = 1). Byes counted. Sched 1.00 = average; higher = easier.</p>
       <button class="btn" data-act="ask-trade">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
   }
@@ -615,14 +832,14 @@ const ANA = {};   // key -> {status, text, ...}
 function anaKey(kind, ids) { return kind + ":" + (kind === "compare" ? [...ids].sort() : ids).join(","); }
 function anaPanel(kind, ids, auto) {
   const k = anaKey(kind, ids), st = ANA[k];
-  const label = kind === "compare" ? "Analysis" : kind === "trade" ? "Trade write-up" : "Start/sit write-up";
+  const label = kind === "compare" ? "Analysis" : kind === "trade" ? "Trade write-up" : kind === "profile" ? "Season write-up" : "Start/sit write-up";
   let inner;
   if (!st || st.status === "none") inner = auto ? `<p class="muted small"><span class="spin"></span>Starting…</p>`
     : `<button class="btn" data-act="ana" data-kind="${kind}">Write the analysis</button> <span class="muted small">about 30–60 seconds; checks this week's injury news</span>`;
   else if (st.status === "working") inner = `<p class="muted small"><span class="spin"></span>Writing it now: pulling this week's injury and news context, then reading the numbers. About 30–60 seconds.</p>`;
   else if (st.status === "error") inner = `<p class="small v-bad">${esc(st.error || "Couldn't write it.")}</p><button class="btn ghost sm" data-act="ana" data-kind="${kind}">Try again</button>`;
-  else if (st.status === "offline") inner = `<p class="small muted">Written analysis runs on the iMac. Open the hub from the iMac's address (http://192.168.68.62:8765) to use it.</p>`;
-  else inner = md(st.text) + `<p class="note">Written ${when(st.at)} from the numbers above plus a web check of injuries and news. Saved for today, so reopening it is free.</p>`;
+  else if (st.status === "offline") inner = `<p class="small muted">New write-ups are made by the iMac. At home, open <a href="http://192.168.68.62:8765/${location.hash}">the iMac version</a> to write this one; ones already written show up here too.</p>`;
+  else inner = md(st.text) + `<p class="note">Written ${when(st.at)} from the numbers ${kind === "profile" ? "on this page" : "above"} plus a web check of injuries and news. Saved ${kind === "profile" ? "until next week's stats land" : "for today"}, so reopening it is free.</p>`;
   return `<div class="ana" id="ana" data-kind="${kind}" data-ids="${ids.join(",")}"><div class="lbl">${label}</div>${inner}</div>`;
 }
 function md(t) {
@@ -644,10 +861,21 @@ async function anaCheck(kind, ids, auto) {
     const r = await fetch(`/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`);
     if (!r.ok) throw 0;
     ANA[k] = await r.json();
-  } catch { ANA[k] = {status: "offline"}; }
+  } catch { ANA[k] = await published(kind, ids); }
   if (ANA[k].status === "working") anaPoll(kind, ids);
   else if (ANA[k].status === "none" && auto) return anaStart(kind, ids);
   refreshAna(kind, ids);
+}
+/* On the phone (GitHub Pages) there's no iMac server: show a write-up if one was already made today. */
+async function published(kind, ids) {
+  try {
+    const d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const period = kind === "profile" ? "wk" + D.meta.week : day;
+    const idx = ANA._idx || (ANA._idx = await load("analysis/index"));
+    const f = idx[`${period}|${kind}|${(kind === "compare" ? [...ids].sort() : ids).join(",")}`];
+    if (f) return await load("analysis/" + f);
+  } catch {}
+  return {status: "offline"};
 }
 async function anaStart(kind, ids) {
   const k = anaKey(kind, ids);
@@ -685,6 +913,7 @@ function render() {
   if (r === "p") html = V.player(a);
   else if (r === "c") html = V.compare(a, b);
   else if (r === "news") html = V.news();
+  else if (r === "waivers") html = V.waivers();
   else if (r === "ss") html = V.ss();
   else if (r === "trade") html = V.trade();
   else if (r && r.startsWith("roster")) html = V.roster();
@@ -696,20 +925,23 @@ function render() {
     render(); setTimeout(() => document.querySelector(".ss-slot")?.focus(), 0);
   }));
   const anaEl = $("#ana");
-  if (anaEl) anaCheck(anaEl.dataset.kind, anaEl.dataset.ids.split(","), anaEl.dataset.kind === "compare");
+  if (anaEl) anaCheck(anaEl.dataset.kind, anaEl.dataset.ids.split(","), anaEl.dataset.kind === "compare" || anaEl.dataset.kind === "profile");
 }
 let lastHash = "";
 window.addEventListener("hashchange", () => { if (location.hash.split("/")[1] !== lastHash.split("/")[1] || location.hash.startsWith("#/p") || location.hash.startsWith("#/c")) scrollTo(0, 0); lastHash = location.hash; render(); });
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme]");
+  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-ssg],[data-mxs],[data-wpos]");
   if (!t) return;
   if (t.dataset.pos) { V.home.pos = t.dataset.pos; render(); return; }
   if (t.dataset.view) { V.home.view = t.dataset.view; render(); return; }
-  if (t.dataset.theme) { try { localStorage.setItem("theme", t.dataset.theme); } catch {} document.documentElement.dataset.look = t.dataset.theme; render(); return; }
+  if (t.dataset.mxs) { V.mx = {sort: t.dataset.mxs}; render(); return; }
+  if (t.dataset.wpos) { V.wPos = t.dataset.wpos; render(); return; }
+  if (t.dataset.theme) { try { localStorage.setItem("theme", t.dataset.theme); } catch {} document.documentElement.dataset.look = t.dataset.theme; render(); window.dispatchEvent(new Event("resize")); document.dispatchEvent(new Event("visibilitychange")); return; }
   if (t.dataset.nf) { V.news.f = t.dataset.nf; render(); return; }
   if (t.dataset.rm) { V[t.dataset.rm] = V[t.dataset.rm].filter(x => x !== t.dataset.id); if (t.dataset.rm === "rIds") setRoster(V.rIds); render(); return; }
   if (t.dataset.ssn) { V.ssN = +t.dataset.ssn; render(); return; }
+  if (t.dataset.ssg) { ssFromRoster(t.dataset.ssg); render(); return; }
   if (t.dataset.addss) { V.ssIds = V.ssIds || []; V.ssIds.push(t.dataset.addss); render(); return; }
   const id = t.dataset.id;
   switch (t.dataset.act) {
@@ -727,6 +959,8 @@ document.addEventListener("click", e => {
     }
     case "clear": setRoster([]); render(); break;
     case "ask-ss": ask(askSS()); break;
+    case "whide": V.wHide = !V.wHide; render(); break;
+    case "ss-clear": V.ssIds = []; V.ssOut = []; V.ssGroup = null; V.ssSlots = 3; V.ssN = 1; render(); break;
     case "ss-add": V.ssSlots = (V.ssSlots || 3) + 1; render(); setTimeout(() => [...document.querySelectorAll(".ss-slot")].pop()?.focus(), 0); break;
     case "ana": { const a = $("#ana"); anaStart(a.dataset.kind, a.dataset.ids.split(",")); break; }
     case "ask-trade": ask(askTrade()); break;
@@ -740,6 +974,9 @@ document.addEventListener("click", e => {
     D.news = await load("news").catch(() => ({cards: [], updated: D.meta.updated}));
     D.kdef = await load("kdef").catch(() => ({K: [], DEF: []}));
     D.ros = await load("ros").catch(() => ({players: []}));
+    D.luck = await load("luck").catch(() => ({players: {}}));
+    D.waivers = await load("waivers").catch(() => ({players: []}));
+    buildKDefDvp();
   } catch (e) {
     $("#app").innerHTML = `<p>Couldn't load the data (${esc(e.message)}). Pull to refresh.</p>`; return;
   }
