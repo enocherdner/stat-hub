@@ -219,7 +219,17 @@ function project(id, wk) {
 function ros(id) {
   const p = BY[id], S = summary(id), from = nextWeek();
   const games = nextGames(p.team, from);
-  const base = S.gp ? (S.l4gp ? 0.6 * S.l4.ppg + 0.4 * S.s.ppg : S.s.ppg) : 0;
+  // Rest of season leans on the whole season plus the USAGE trend: a real role change moves it,
+  // a few cold (or hot) scoring weeks on the same usage barely do.
+  const pts = S.gp ? (S.l4gp ? 0.75 * S.s.ppg + 0.25 * S.l4.ppg : S.s.ppg) : 0;
+  const sh = p.pos === "QB" ? null : share(p.pos, S.s), sh4 = p.pos === "QB" ? null : share(p.pos, S.l4);
+  const snapT = S.s.snp ? S.l4.snp / S.s.snp : 1;
+  let usageF = 1;
+  if (S.l4gp >= 2 && S.gp >= 4) {
+    const r = sh ? sh4 / sh : snapT;
+    usageF = Math.max(0.8, Math.min(1.2, 1 + (r - 1) * 0.5));
+  }
+  const base = pts * usageF;
   const room = roomInfo(id);
   let miss = 0;
   if (p.inj === "IR" || p.inj === "PUP") miss = 4; else if (OUT.has(p.inj)) miss = 1;
@@ -231,7 +241,7 @@ function ros(id) {
     total += base * mf * room.adj * f;
   });
   const sos = mfs.length ? mfs.reduce((a, b) => a + b, 0) / mfs.length : 1;
-  return {id, p, S, base, games: games.length, miss, sos, roomAdj: room.adj, roomNotes: room.notes, total};
+  return {id, p, S, base, usageF, sh, sh4, games: games.length, miss, sos, roomAdj: room.adj, roomNotes: room.notes, total};
 }
 
 /* ---------------- views ---------------- */
@@ -242,33 +252,86 @@ function stamp() {
   return `<p class="note">Week ${D.meta.week} stats · updated ${ago(D.meta.updated)} · ${c.games_checked}/${c.games_final} games cross-checked vs ESPN box scores (${c.fixes} corrected) · half PPR</p>`;
 }
 
+const LIST_LEN = {QB: 36, RB: 60, WR: 72, TE: 36, FLEX: 100, K: 32, DEF: 32};
+const MIN_GP = 3;
+function rnk(i) { return `<span class="rk ${i === 0 ? "gold" : ""}">${i + 1}</span>`; }
 V.home = () => {
   setTab("home");
+  const view = V.home.view || "ppg";
   const pos = V.home.pos || "RB";
+  const sub = `<div class="subtabs"><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button></div>`;
+  const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
+  return `<h1>Rankings</h1>${sub}${posSeg}${view === "ros" ? rosList(pos) : ppgList(pos)}${stamp()}`;
+};
+function ppgList(pos) {
+  const n = LIST_LEN[pos];
   let list;
-  if (pos === "K") list = (D.kdef.K || []).filter(k => k.gp >= 2).slice(0, 20).map(kRow).join("");
-  else if (pos === "DEF") list = (D.kdef.DEF || []).slice(0, 32).map(defRow).join("");
+  if (pos === "K") list = (D.kdef.K || []).filter(k => k.gp >= MIN_GP).slice(0, n).map(kRow).join("");
+  else if (pos === "DEF") list = (D.kdef.DEF || []).slice(0, n).map(defRow).join("");
   else {
     const ok = pos === "FLEX" ? (p => p.pos === "RB" || p.pos === "WR" || p.pos === "TE") : (p => p.pos === pos);
-    list = D.players.filter(p => ok(p) && p.gp >= 2).slice(0, pos === "FLEX" ? 25 : 15).map(p => plRow(p, pos === "FLEX")).join("");
+    list = D.players.filter(p => ok(p) && p.gp >= MIN_GP).slice(0, n).map((p, i) => plRow(p, i)).join("");
   }
   const note = pos === "K" ? "Kickers: FG 0–39 = 3, 40–49 = 4, 50+ = 5, PAT = 1."
     : pos === "DEF" ? "Defenses: sack 1, INT / fumble rec / safety / block 2, TD 6, plus points-allowed tiers (0 = 10 … 35+ = −4)." : "";
-  return `
-  <h2>Top scorers per game</h2>
-  <div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>
-  <div class="card list">${list || '<p class="muted">No data yet.</p>'}</div>
-  ${note ? `<p class="note">${note}</p>` : ""}
-  ${stamp()}`;
-};
+  return `<p class="muted small">Half-PPR points per game · top ${n} · at least ${MIN_GP} games played.</p>
+  <div class="card list">${list || '<p class="muted">No data yet.</p>'}</div>${note ? `<p class="note">${note}</p>` : ""}`;
+}
 function kRow(k, i) {
-  return `<div class="pl" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span class="muted small" style="width:20px">${i + 1}</span>${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+  return `<div class="pl">${rnk(i)}${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · ${k.gp} gp · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
 }
 function defRow(d, i) {
-  return `<div class="pl" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)"><span class="muted small" style="width:20px">${i + 1}</span><span class="grow"><b>${esc(d.team)} D/ST</b><br><span class="muted small">${d.sack} sacks · ${d.int} INT · ${d.fr} FR · ${d.td} TD · allows ${f1(d.papg)}/g</span></span><span class="r"><b>${f1(d.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+  return `<div class="pl">${rnk(i)}<span class="grow"><b>${esc(d.team)} D/ST</b><br><span class="muted small">${d.gp} gp · ${d.sack} sacks · ${d.int} INT · ${d.fr} FR · ${d.td} TD · allows ${f1(d.papg)}/g</span></span><span class="r"><b>${f1(d.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
 }
-function plRow(p, showPos) {
-  return `<a class="pl" href="#/p/${p.id}">${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)}<br><span class="muted small">${p.pos} · ${p.team}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
+/* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
+function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
+function sigWhy(r) {
+  const d = r.det, bits = [];
+  bits.push(`${f1(d.S.s.ppg)} ppg season, ${f1(d.S.l4.ppg)} last ${d.S.l4gp}`);
+  if (d.sh != null && d.S.l4gp) bits.push(`${d.p.pos === "RB" ? "opp" : "target"} share ${pct(d.sh4)} vs ${pct(d.sh)}`);
+  if (Math.abs(d.sos - 1) >= 0.03) bits.push(`schedule ${d.sos > 1 ? "easier" : "tougher"} (${d.sos.toFixed(2)})`);
+  if (d.roomAdj !== 1) bits.push(d.roomAdj < 1 ? "teammate returning" : "teammate out");
+  if (d.miss) bits.push(`misses ~${d.miss} (${d.p.inj})`);
+  if (d.games < 8) bits.push(`${d.games} games left`);
+  return bits.join(" · ");
+}
+function rosList(pos) {
+  const all = D.ros.players || [];
+  const inPos = pos === "FLEX" ? (r => ["RB","WR","TE"].includes(r.pos)) : (r => r.pos === pos);
+  const rows = all.filter(inPos).slice(0, LIST_LEN[pos]).map(r => {
+    let ours = null;
+    let det = null;
+    if (r.id && BY[r.id] && (D.stats[r.id] || []).length) { det = ros(r.id); ours = det.total; }
+    else if (r.pos === "K") { const k = (D.kdef.K || []).find(k => k.team === r.team && norm(k.name) === norm(r.name)); if (k) ours = k.ppg * gamesLeft(k.team); }
+    else if (r.pos === "DEF") { const d = (D.kdef.DEF || []).find(d => d.team === r.team); if (d) ours = d.ppg * gamesLeft(d.team); }
+    return {...r, ours, det};
+  });
+  // our rank within the same list, so the two ranks are comparable
+  const scored = rows.filter(r => r.ours != null).sort((a, b) => b.ours - a.ours);
+  scored.forEach((r, i) => r.ourRank = i + 1);
+  rows.forEach((r, i) => {
+    r.ecrRank = i + 1;
+    if (r.ourRank == null || (r.det && r.det.S.gp < MIN_GP)) return;   // too few games to call it
+    const gap = r.ecrRank - r.ourRank, need = Math.max(8, Math.round(r.ecrRank * 0.4));
+    r.sig = gap >= need ? "BUY" : gap <= -need ? "SELL" : "";
+    r.gap = gap;
+  });
+  const lbl = pos === "FLEX" ? "FLEX" : pos;
+  const body = rows.map((r, i) => {
+    const p = r.id ? BY[r.id] : null;
+    const name = p ? `<a href="#/p/${p.id}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`;
+    const sig = r.sig ? `<span class="sig ${r.sig === "BUY" ? "buy" : "sell"}" title="Expert ${lbl}${r.ecrRank} vs our ${lbl}${r.ourRank}">${r.sig}</span>` : "";
+    const why = r.sig && r.det ? sigWhy(r) : "";
+    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${sig}<br><span class="muted small">${r.pos} · ${r.team}${r.bye ? " · bye " + r.bye : ""} · experts ${lbl}${r.ecrRank} (overall ${r.ecr}, range ${r.min}–${r.max})${r.ourRank ? ` · ours ${lbl}${r.ourRank}` : ""}</span>${why ? `<br><span class="tiny ${r.sig === "BUY" ? "v-good" : "v-bad"}">${esc(why)}</span>` : ""}</span>
+      <span class="r"><b>${r.ours == null ? "–" : f1(r.ours)}</b><br><span class="muted tiny">our ROS pts</span></span></div>`;
+  }).join("");
+  const buys = rows.filter(r => r.sig === "BUY").length, sells = rows.filter(r => r.sig === "SELL").length;
+  return `<p class="muted small">Ordered by the expert consensus (${esc(D.ros.source || "FantasyPros")}). Our ROS points = per-game value × each remaining opponent through week ${LAST_FANTASY_WEEK} × teammate changes × injuries.
+  <b class="v-good">BUY</b> = our numbers rank him well above the experts; <b class="v-bad">SELL</b> = well below. ${buys} buys · ${sells} sells.</p>
+  <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
+}
+function plRow(p, i) {
+  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
 }
 
 function statTiles(p, a, n) {
@@ -505,7 +568,7 @@ V.trade = () => {
       <div class="small muted" style="margin-top:4px">You give ${f1(tg)} · you get ${f1(tr)} projected half-PPR points through week ${LAST_FANTASY_WEEK}.</div></div>
       ${tbl(G, "You give")}${tbl(R, "You get")}</div>
       ${anaPanel("trade", [...V.give, "|", ...V.get], false)}
-      <p class="note">ROS points = per-game value (60% last 4 + 40% season) × each remaining opponent's points allowed to the position (half weight) × room changes, minus games lost to injury (IR = 4 weeks, Out = 1). Byes counted. Sched 1.00 = average; higher = easier.</p>
+      <p class="note">ROS points = per-game value (75% season + 25% last 4, × usage trend: last-4 share vs season, half weight) × each remaining opponent's points allowed to the position (half weight) × room changes, minus games lost to injury (IR = 4 weeks, Out = 1). Byes counted. Sched 1.00 = average; higher = easier.</p>
       <button class="btn" data-act="ask-trade">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
   }
   return `<h1>Trade analyzer</h1>
@@ -527,7 +590,8 @@ V.roster = () => {
   <h2>Paste names</h2>
   <textarea id="names" rows="4" placeholder="One per line or comma separated"></textarea>
   <div class="row" style="margin-top:8px"><button class="btn" data-act="paste">Add names</button><button class="btn ghost" data-act="clear">Clear roster</button></div>
-  <p id="pastemsg" class="small muted"></p>`;
+  <p id="pastemsg" class="small muted"></p>
+  <h2>Look</h2><div class="seg">${["gameday","classic"].map(x => `<button class="chip ${(document.documentElement.dataset.look || "gameday") === x ? "on" : ""}" data-theme="${x}">${x === "gameday" ? "Gameday" : "Classic purple"}</button>`).join("")}</div>`;
 };
 
 /* ---------------- the "Ask" button (the only place Claude is involved) ---------------- */
@@ -638,9 +702,11 @@ let lastHash = "";
 window.addEventListener("hashchange", () => { if (location.hash.split("/")[1] !== lastHash.split("/")[1] || location.hash.startsWith("#/p") || location.hash.startsWith("#/c")) scrollTo(0, 0); lastHash = location.hash; render(); });
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn]");
+  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme]");
   if (!t) return;
   if (t.dataset.pos) { V.home.pos = t.dataset.pos; render(); return; }
+  if (t.dataset.view) { V.home.view = t.dataset.view; render(); return; }
+  if (t.dataset.theme) { try { localStorage.setItem("theme", t.dataset.theme); } catch {} document.documentElement.dataset.look = t.dataset.theme; render(); return; }
   if (t.dataset.nf) { V.news.f = t.dataset.nf; render(); return; }
   if (t.dataset.rm) { V[t.dataset.rm] = V[t.dataset.rm].filter(x => x !== t.dataset.id); if (t.dataset.rm === "rIds") setRoster(V.rIds); render(); return; }
   if (t.dataset.ssn) { V.ssN = +t.dataset.ssn; render(); return; }
@@ -673,6 +739,7 @@ document.addEventListener("click", e => {
     [D.meta, D.players, D.stats, D.teams] = await Promise.all(["meta", "players", "stats", "teams"].map(load));
     D.news = await load("news").catch(() => ({cards: [], updated: D.meta.updated}));
     D.kdef = await load("kdef").catch(() => ({K: [], DEF: []}));
+    D.ros = await load("ros").catch(() => ({players: []}));
   } catch (e) {
     $("#app").innerHTML = `<p>Couldn't load the data (${esc(e.message)}). Pull to refresh.</p>`; return;
   }

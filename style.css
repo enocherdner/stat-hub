@@ -72,8 +72,8 @@ td.fx{text-decoration:underline dotted var(--warn);text-underline-offset:3px}
 .sides{display:grid;grid-template-columns:1fr;gap:10px}
 @media(min-width:700px){.sides{grid-template-columns:1fr 1fr}}
 .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-weight:600;z-index:50;max-width:90vw}
-.list a.pl{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink)}
-.list a.pl:last-child{border-bottom:0}
+.list .pl{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+.list .pl:last-child{border-bottom:0}
 .list .r{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
 .seg{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .note{font-size:12px;color:var(--muted);margin-top:8px}
@@ -92,3 +92,39 @@ td.fx{text-decoration:underline dotted var(--warn);text-underline-offset:3px}
 .list .pl-wrap:last-child{border-bottom:0}
 .list .pl-wrap a.pl{flex:1;border-bottom:0;min-width:0}
 .seg .chip{min-width:48px}
+
+/* ranks, signals, sub-tabs */
+.rk{flex:none;width:28px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px}
+.rk.gold{color:#1a1300;background:var(--gold,#f5c542);border-radius:8px;padding:3px 0;box-shadow:0 0 0 2px rgba(245,197,66,.25)}
+.sig{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.05em;padding:2px 7px;border-radius:6px;vertical-align:1px}
+.sig.buy{background:var(--good-bg);color:var(--good);border:1px solid rgba(63,185,80,.5)}
+.sig.sell{background:rgba(248,81,73,.14);color:var(--bad);border:1px solid rgba(248,81,73,.5)}
+.subtabs{display:flex;gap:0;margin:12px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px}
+.subtabs button{flex:1;background:none;border:0;color:var(--muted);font-weight:700;padding:9px 6px;border-radius:9px;cursor:pointer;font-size:14px}
+.subtabs button.on{background:var(--grad);color:#fff}
+
+/* ---------- Gameday look (default): navy night game, turf header with yard lines, purple accents, gold #1 ---------- */
+:root[data-look="gameday"]{
+  --bg:#070c18; --panel:#0f1729; --panel2:#17213a; --line:#233150; --ink:#eef2fb; --ink2:#b3bdd3; --muted:#7f8aa3;
+  --acc:#a78bfa; --grad:linear-gradient(135deg,#6d28d9 0%,#7c3aed 55%,#8b5cf6 100%); --bar:#8b5cf6; --bar2:#2b2352;
+  --good:#34d058; --good-bg:rgba(52,208,88,.15); --bad:#ff5a52; --gold:#f5c542;
+  --turf:#0f3d24; --turf2:#135a32;
+}
+:root[data-look="gameday"] body{background:radial-gradient(900px 420px at 50% -120px,rgba(124,58,237,.18),transparent 70%),var(--bg)}
+:root[data-look="gameday"] .top{
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.10) 0 2px,transparent 2px 44px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,transparent 1px 8.8px),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.10) 0 22px,rgba(255,255,255,.025) 22px 44px),
+    linear-gradient(180deg,var(--turf2),var(--turf));
+  border-bottom:3px solid #7c3aed; box-shadow:0 6px 20px -10px rgba(0,0,0,.8)}
+:root[data-look="gameday"] .brand{background:none;color:#fff;-webkit-background-clip:initial;background-clip:initial;text-shadow:0 1px 0 rgba(0,0,0,.4);font-style:italic;text-transform:uppercase;letter-spacing:.02em}
+:root[data-look="gameday"] .brand::before{content:"🏈 ";font-style:normal}
+:root[data-look="gameday"] .search input{background:rgba(7,12,24,.78);border-color:rgba(255,255,255,.18)}
+:root[data-look="gameday"] .tabs{background:rgba(7,12,24,.97);border-top:1px solid var(--line)}
+:root[data-look="gameday"] .tabs a.on{color:#fff;box-shadow:inset 0 3px 0 0 #8b5cf6;background:linear-gradient(180deg,rgba(139,92,246,.22),transparent 75%)}
+:root[data-look="gameday"] h1{text-transform:uppercase;font-style:italic;letter-spacing:.01em}
+:root[data-look="gameday"] h2{color:var(--acc)}
+:root[data-look="gameday"] .card{background:linear-gradient(180deg,var(--panel),#0c1424);border-color:var(--line)}
+:root[data-look="gameday"] .room tr.me td{background:#211a44}
+:root[data-look="gameday"] .ana h3{background:none;color:var(--acc);-webkit-background-clip:initial;background-clip:initial}

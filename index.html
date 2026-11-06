@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#0f3d24">
+<script>try{document.documentElement.dataset.look=localStorage.getItem("theme")||"gameday"}catch(e){document.documentElement.dataset.look="gameday"}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Stat Hub">
 <title>Stat Hub</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%88%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <header class="top">
@@ -21,13 +22,13 @@
 </header>
 <main id="app"><p class="muted pad">Loading…</p></main>
 <nav class="tabs">
-  <a href="#/" data-tab="home">Players</a>
+  <a href="#/" data-tab="home">Rankings</a>
   <a href="#/news" data-tab="news">News</a>
   <a href="#/ss" data-tab="ss">Start/Sit</a>
   <a href="#/trade" data-tab="trade">Trade</a>
   <a href="#/roster" data-tab="roster">My Roster</a>
 </nav>
 <div id="toast" class="toast" hidden></div>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
