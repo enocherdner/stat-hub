@@ -11,16 +11,19 @@
   document.body.appendChild(cap);
   const ctx = cv.getContext("2d");
   const bg = document.createElement("canvas"), bctx = bg.getContext("2d");
-  let W = 0, H = 0, dpr = 1, vert = false, plays = [], idx = 0, t0 = 0, raf = 0, last = 0;
+  let W = 0, H = 0, dpr = 1, vert = false, plays = [], idx = 0, t0 = 0, raf = 0, last = 0, top = 0, bot = 0;
 
   // field units: u = 0..120 along the length (0 = left/bottom end line), v = 0..53.3 across
   const L = 120, Wd = 53.3;
-  const P = (u, v) => vert ? [v / Wd * W, (L - u) / L * H] : [u / L * W, v / Wd * H];
-  const scale = () => vert ? H / L : W / L;      // px per yard along the field
+  // the field fits between the sticky header/tab bar and the bottom bar, so both end zones are visible
+  const FH = () => H - top - bot;
+  const P = (u, v) => vert ? [v / Wd * W, top + (L - u) / L * FH()] : [u / L * W, top + v / Wd * FH()];
+  const scale = () => vert ? FH() / L : W / L;      // px per yard along the field
 
   function drawField() {
     bg.width = W * dpr; bg.height = H * dpr;
     const g = bctx; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = "#0b2a18"; g.fillRect(0, 0, W, H);
     // turf with 5-yard mow stripes
     for (let u = 0; u < L; u += 5) {
       g.fillStyle = (Math.floor(u / 5) % 2) ? "#1d4d2f" : "#1a4529";
@@ -179,6 +182,10 @@
   function size() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     W = window.innerWidth; H = window.innerHeight; vert = H > W;
+    const hd = document.querySelector(".top"), tb = document.querySelector(".tabs");
+    const tabsBottom = tb && getComputedStyle(tb).position === "fixed";
+    top = (hd ? hd.getBoundingClientRect().height : 0) + (tb && !tabsBottom ? tb.getBoundingClientRect().height : 0);
+    bot = tb && tabsBottom ? tb.getBoundingClientRect().height : 0;
     cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
     drawField();
     paint(plays[idx], reduce ? 1 : 0, 1);
