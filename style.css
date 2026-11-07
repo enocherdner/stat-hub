@@ -242,3 +242,17 @@ body{background:transparent!important}
 :root[data-ink="swap"] td.v-bad,:root[data-ink="swap"] .v-bad{color:var(--bad)}
 :root[data-ink="swap"] main a.btn,:root[data-ink="swap"] main a.chip{color:inherit}
 :root[data-ink="swap"][data-look="gameday"] main{text-shadow:0 1px 2px rgba(0,0,0,1),0 0 8px rgba(0,0,0,.7)}
+/* Readability pass (11-07): Inter for text, Barlow Semi Condensed for numbers (sporty scoreboard feel, very legible),
+   heavier weights, lighter purple for stats, and a crisp dark outline so everything pops on the field */
+html,body{font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Text",Segoe UI,Roboto,sans-serif}
+main a b,.pl b,td:first-child{font-weight:700}
+:root[data-ink="swap"]{--stat:#ddd2ff}
+.pl .r b,.tile b,td:not(:first-child),.rk,.rank .n{font-family:"Barlow Semi Condensed",Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.pl .r b{font-size:19px;font-weight:800}
+.tile b{font-size:22px;font-weight:800}
+td:not(:first-child){font-size:14.5px;font-weight:700}
+th{font-family:Inter,system-ui,sans-serif;font-weight:700}
+:root[data-look="gameday"] main{text-shadow:0 0 2px rgba(0,0,0,.95),0 1px 3px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.5)}
+:root[data-look="gameday"] .badge,:root[data-look="gameday"] .sig,:root[data-look="gameday"] .btn,:root[data-look="gameday"] .chip.on,:root[data-look="gameday"] .rk.gold{text-shadow:none}
+td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;font-weight:700;letter-spacing:0}
+:root[data-ink="swap"] td a,:root[data-ink="swap"] td a b{color:#fff}
