@@ -877,7 +877,7 @@ V.roster = () => {
   <div class="row" style="margin-top:8px"><button class="btn" data-act="paste">Add names</button><button class="btn ghost" data-act="clear">Clear roster</button></div>
   <p id="pastemsg" class="small muted"></p>
   <h2>Look</h2><div class="seg">${["gameday","classic"].map(x => `<button class="chip ${(document.documentElement.dataset.look || "gameday") === x ? "on" : ""}" data-theme="${x}">${x === "gameday" ? "Gameday" : "Classic purple"}</button>`).join("")}</div>
-  <h2>Text colors</h2><div class="seg">${[["swap","White names, purple stats"],["orig","Purple names, white stats"]].map(([x, l]) => `<button class="chip ${(document.documentElement.dataset.ink || "swap") === x ? "on" : ""}" data-ink="${x}">${l}</button>`).join("")}</div>`;
+  <h2>Text colors</h2><div class="seg">${[["swap","White names, purple stats"],["ice","White names, neon blue stats"],["orig","Purple names, white stats"]].map(([x, l]) => `<button class="chip ${(document.documentElement.dataset.ink || "ice") === x ? "on" : ""}" data-ink="${x}">${l}</button>`).join("")}</div>`;
 };
 
 /* ---------------- the "Ask" button (the only place Claude is involved) ---------------- */

@@ -256,3 +256,11 @@ th{font-family:Inter,system-ui,sans-serif;font-weight:700}
 :root[data-look="gameday"] .badge,:root[data-look="gameday"] .sig,:root[data-look="gameday"] .btn,:root[data-look="gameday"] .chip.on,:root[data-look="gameday"] .rk.gold{text-shadow:none}
 td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;font-weight:700;letter-spacing:0}
 :root[data-ink="swap"] td a,:root[data-ink="swap"] td a b{color:#fff}
+
+/* "ice": same as swap but stats in neon light blue (blue isn't used for good/bad anywhere) */
+:root[data-ink="ice"]{--stat:#7ee7ff}
+:root[data-ink="ice"] main a,:root[data-ink="ice"] .pl b:not(.r b),:root[data-ink="ice"] .sugg button,:root[data-ink="ice"] td:first-child,:root[data-ink="ice"] td a,:root[data-ink="ice"] td a b,:root[data-ink="ice"] main a b{color:#fff}
+:root[data-ink="ice"] .pl .r b,:root[data-ink="ice"] .tile b,:root[data-ink="ice"] td:not(:first-child),:root[data-ink="ice"] .rk:not(.gold){color:var(--stat)}
+:root[data-ink="ice"] .cmp td.win,:root[data-ink="ice"] td.v-good,:root[data-ink="ice"] .v-good{color:var(--good)}
+:root[data-ink="ice"] td.v-bad,:root[data-ink="ice"] .v-bad{color:var(--bad)}
+:root[data-ink="ice"] main a.btn,:root[data-ink="ice"] main a.chip{color:inherit}
