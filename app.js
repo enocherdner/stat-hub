@@ -51,21 +51,42 @@ function matchName(name) {
 }
 
 /* ---------------- search ---------------- */
-function search(q, limit = 8) {
-  const n = norm(q); if (!n) return [];
-  const parts = n.split(" ");
-  const out = [];
-  for (const p of D.players) {
-    const pn = p._n || (p._n = norm(p.name));
-    const words = pn.split(" ");
-    let ok = parts.every(t => words.some(w => w.startsWith(t)) || pn.startsWith(t));
-    if (!ok && n.length > 3) ok = pn.includes(n);
-    if (ok) { out.push(p); if (out.length >= 60) break; }
+// search: punctuation splits words ("Amon-Ra" -> "amon ra"), the joined form also matches ("amonra"),
+// and a 1-letter typo is forgiven on words of 4+ letters. Exact prefix hits rank above typo hits.
+const snorm = s => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z ]+/g, " ").replace(/\b(jr|sr|ii|iii|iv)\b/g, " ").replace(/\s+/g, " ").trim();
+function near(a, b) {                       // edit distance <= 1
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, e = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++e > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++;
+    else if (a[i + 1] === b[j] && a[i] === b[j + 1]) { i += 2; j += 2; }     // swapped letters count as one typo
+    else { i++; j++; }
   }
-  return out.slice(0, limit);   // players.json is already sorted by ppg, so the best guesses come first
+  return e + (a.length - i) + (b.length - j) <= 1;
+}
+const NICK = {jsn: "jaxon smith njigba", cmc: "christian mccaffrey", arsb: "amon ra st brown", sunshine: "amon ra st brown", ajb: "aj brown", aj: "aj brown", tmac: "terry mclaurin", mhj: "marvin harrison", btj: "brian thomas", kw: "kenneth walker", bijan: "bijan robinson", jjj: "justin jefferson", jj: "justin jefferson", cd: "ceedee lamb", ceedee: "ceedee lamb", hollywood: "marquise brown", dk: "dk metcalf", tk: "travis kelce", ekeler: "austin ekeler", jt: "jonathan taylor", dhop: "deandre hopkins", nuk: "deandre hopkins", lamar: "lamar jackson", mahomes: "patrick mahomes", saquon: "saquon barkley"};
+function search(q, limit = 8) {
+  let n = snorm(q); if (!n) return [];
+  if (NICK[n.replace(/ /g, "")]) n = NICK[n.replace(/ /g, "")];
+  const parts = n.split(" "), joinedQ = n.replace(/ /g, "");
+  const exact = [], fuzzy = [];
+  for (const p of D.players) {
+    const pn = p._s || (p._s = snorm(p.name)), words = p._w || (p._w = pn.split(" ")), joined = p._j || (p._j = pn.replace(/ /g, ""));
+    if (parts.every(t => words.some(w => w.startsWith(t))) || joined.startsWith(joinedQ) || (joinedQ.length > 2 && joined.includes(joinedQ))) { exact.push(p); continue; }
+    if (fuzzy.length < limit && parts.every(t => words.some(w => w.startsWith(t) || (t.length >= 4 && (near(t, w.slice(0, t.length)) || near(t, w.slice(0, t.length + 1)) || near(t, w.slice(0, t.length - 1))))))) fuzzy.push(p);
+  }
+  // last resort for multi-word searches: any player whose other name matches (e.g. "Travion Henderson")
+  if (!exact.length && !fuzzy.length && parts.length > 1)
+    for (const p of D.players) if (parts.some(t => t.length >= 4 && p._w.some(w => w === t || (w.length >= 5 && near(t, w))))) { fuzzy.push(p); if (fuzzy.length >= limit) break; }
+  return exact.concat(fuzzy).slice(0, limit);   // players.json is sorted by ppg, so the best guesses come first
 }
 function attachSearch(input, box, onPick) {
   let sel = 0, res = [];
+  // stop iPhone autocorrect/autocap from rewriting names as you type ("Amon" -> "Almond")
+  for (const [k, v] of [["autocorrect", "off"], ["autocapitalize", "off"], ["autocomplete", "off"], ["spellcheck", "false"]]) input.setAttribute(k, v);
   const draw = () => {
     res = search(input.value);
     if (!res.length) { box.hidden = true; return; }
