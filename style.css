@@ -264,3 +264,6 @@ td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;
 :root[data-ink="ice"] .cmp td.win,:root[data-ink="ice"] td.v-good,:root[data-ink="ice"] .v-good{color:var(--good)}
 :root[data-ink="ice"] td.v-bad,:root[data-ink="ice"] .v-bad{color:var(--bad)}
 :root[data-ink="ice"] main a.btn,:root[data-ink="ice"] main a.chip{color:inherit}
+/* search dropdown must sit above the tab bar (desktop tabs sit right under the header and were hiding the first result) */
+.top{z-index:40}
+.sugg{z-index:60}
