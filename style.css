@@ -231,3 +231,14 @@ body{background:transparent!important}
 .sr{display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08)}
 .sr:last-child{border-bottom:0}
 .sr.po b{color:var(--gold,#f5c542)}
+
+/* Text colors: "swap" = player names white, stats/numbers bright purple (readable on the green field) */
+:root[data-ink="swap"]{--stat:#c9b8ff}
+:root[data-ink="swap"] main a,:root[data-ink="swap"] .pl b:not(.r b),:root[data-ink="swap"] .sugg button{color:#fff}
+:root[data-ink="swap"] .pl .r b,:root[data-ink="swap"] .tile b,:root[data-ink="swap"] td:not(:first-child),:root[data-ink="swap"] .rk:not(.gold){color:var(--stat)}
+:root[data-ink="swap"] main a b{color:#fff}
+:root[data-ink="swap"] td:first-child,:root[data-ink="swap"] td:first-child a{color:#fff}
+:root[data-ink="swap"] .cmp td.win,:root[data-ink="swap"] td.v-good,:root[data-ink="swap"] .v-good{color:var(--good)}
+:root[data-ink="swap"] td.v-bad,:root[data-ink="swap"] .v-bad{color:var(--bad)}
+:root[data-ink="swap"] main a.btn,:root[data-ink="swap"] main a.chip{color:inherit}
+:root[data-ink="swap"][data-look="gameday"] main{text-shadow:0 1px 2px rgba(0,0,0,1),0 0 8px rgba(0,0,0,.7)}

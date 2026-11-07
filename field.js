@@ -3,7 +3,7 @@
    data, so the route shape is illustrative. No Claude, no libraries: one canvas, the field cached offscreen. */
 (function () {
   "use strict";
-  const NOTE = "Real plays from nflverse play-by-play: start spot, yards gained, result and players are real. The route shape is illustrative (no tracking data).";
+  const NOTE = "Real plays from nflverse play-by-play: start spot, pass depth, side of the field, run gap, yards gained, result and players are real. The exact steps are reconstructed (free data has no player tracking): routes come from the route tree that fits the real depth and side.";
   const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const cv = document.createElement("canvas"); cv.id = "field"; cv.setAttribute("aria-hidden", "true");
   document.body.prepend(cv);
@@ -81,33 +81,96 @@
     g.fillStyle = grad; g.fillRect(0, 0, bg.width, bg.height);
   }
 
-  /* ---- one play: formation + path, all in field units ---- */
-  const LANE = {left: 13, middle: 26.65, right: 40.3};
+  /* ---- one play: formation + path, all in field units ----
+     Real: start spot, pass depth (air yards), side of the field, run gap, yards gained, end spot.
+     Reconstructed: the exact steps in between. Routes are picked from a real route tree to match the
+     depth and side of the throw; runs press the real gap, then cut. Paths are smoothed so they flow. */
+  function hash(p) { let h = 7; for (const c of (p.caption || "") + p.start) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+  // straight stems with a rounded turn at each break (no overshoot loops), sampled densely.
+  // Returns the dense path and, for each key point, the index where the path passes it.
+  function smooth(pts, rad = 2.2, wideFrom = 1e9) {
+    const out = [pts[0]], at = [0];
+    const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const [p, c, n] = [pts[i - 1], pts[i], pts[i + 1]];
+      const d1 = Math.hypot(c[0] - p[0], c[1] - p[1]), d2 = Math.hypot(n[0] - c[0], n[1] - c[1]);
+      const r = Math.min(i >= wideFrom ? 9 : rad, d1 * 0.48, d2 * 0.48);
+      const a = lerp(c, p, d1 ? r / d1 : 0), z = lerp(c, n, d2 ? r / d2 : 0);
+      const prev = out[out.length - 1], steps = Math.max(2, Math.ceil(Math.hypot(a[0] - prev[0], a[1] - prev[1]) / 1.5));
+      for (let j = 1; j <= steps; j++) out.push(lerp(prev, a, j / steps));
+      const nn = i >= wideFrom ? 18 : 8;
+      for (let j = 1; j <= nn; j++) { const t = j / nn, m = 1 - t; out.push([m * m * a[0] + 2 * m * t * c[0] + t * t * z[0], m * m * a[1] + 2 * m * t * c[1] + t * t * z[1]]); if (j === nn / 2) at[i] = out.length - 1; }
+    }
+    const prev = out[out.length - 1], last = pts[pts.length - 1], steps = Math.max(2, Math.ceil(Math.hypot(last[0] - prev[0], last[1] - prev[1]) / 1.5));
+    for (let j = 1; j <= steps; j++) out.push(lerp(prev, last, j / steps));
+    at[pts.length - 1] = out.length - 1;
+    return {out, at};
+  }
+  const clampV = v => Math.max(2, Math.min(Wd - 2, v));
   function build(p) {
     const los = 10 + (100 - p.start);                       // offense drives toward u = 120
     const end = Math.min(los + p.yds, p.td ? 114 : 109.5);
-    const side = LANE[p.loc] ?? 26.65;
+    const h = hash(p), alt = (h & 1) ? 1 : -1;
     const O = [22.3, 24.5, 26.65, 28.8, 31].map(v => [los - 0.7, v]);
     const X = [[los + 1.2, 21.5], [los + 1.2, 24.5], [los + 1.2, 28.8], [los + 1.2, 31.8],
                [los + 5, 18], [los + 5, 26.65], [los + 5, 35], [los + 9, 8], [los + 9, 45.3], [los + 14, 20], [los + 14, 33]];
-    let path, ball = null, qb, carrier;
+    let keys, catchKey = -1, qb, carrier, route = "";
     if (p.type === "run") {
-      qb = [los - 3, 26.65];
-      carrier = [los - 6.5, 26.65];
-      const gapV = p.loc === "middle" ? 26.65 : p.loc === "left" ? (p.gap === "end" ? 18 : 22.5) : (p.gap === "end" ? 35.3 : 30.8);
-      const endV = p.loc === "middle" ? 26.65 : (p.loc === "left" ? 12 : 41.3);
-      path = [carrier, [los - 2, (gapV + 26.65) / 2], [los + 0.5, gapV], [los + Math.min(8, p.yds * 0.3), (gapV * 2 + endV) / 3], [end, endV]];
+      qb = [los - 1.5, 26.65];
+      carrier = [los - 7, 26.65];
+      const toward = p.loc === "left" ? -1 : p.loc === "right" ? 1 : alt * 0.3;
+      const gapV = p.loc === "middle" ? 26.65 + alt * 1.5 : 26.65 + toward * (p.gap === "end" ? 9 : p.gap === "tackle" ? 5 : 2.5);
+      const yds = end - los;
+      // mesh with the QB, press the gap, plant and cut upfield, then a second cut / bend in the open field
+      keys = [carrier, [los - 3.5, 26.65 + toward * 1.2], [los - 0.8, gapV], [los + 2.5, gapV + toward * 0.6]];
+      if (yds > 8) {
+        const cut = clampV(gapV - toward * 4 * (alt > 0 ? 1 : 0.5));           // cutback or bounce
+        keys.push([los + Math.min(8, yds * 0.25), cut]);
+        const lane = clampV(p.loc === "middle" ? 26.65 + alt * 9 : 26.65 + toward * 13);
+        keys.push([los + yds * 0.55, (cut + lane) / 2]);
+        keys.push([los + yds * 0.8, lane]);
+      }
+      keys.push([end, clampV(keys[keys.length - 1][1] + (p.td ? -toward * 2 : toward * 2))]);
+      route = "run";
     } else {
-      qb = [los - 6, 26.65];
-      const wide = p.loc === "middle" ? 21 : p.loc === "left" ? 7 : 46.3;
-      carrier = [los - 0.7, wide];
+      qb = [los - 7, 26.65];                                 // shotgun drop
+      const side = p.loc === "left" ? -1 : p.loc === "right" ? 1 : alt;
+      const outside = p.loc !== "middle";
+      const startV = outside ? 26.65 + side * 19.5 : 26.65 + side * 8;      // wideout vs slot
+      carrier = [los - 0.7, startV];
       const air = Math.max(2, Math.min(p.air || p.yds * 0.5, p.yds));
-      const catchV = p.loc === "middle" ? 25 : p.loc === "left" ? 11 : 42.3;
       const catchU = los + air;
-      path = [carrier, [los + air * 0.55, wide], [catchU, catchV], [end, (catchV + 26.65) / 2]];
-      ball = [qb, [catchU, catchV]];
+      const inside = 26.65 + side * 6, wideV = 26.65 + side * 21;
+      let catchV;
+      if (air <= 5) {                                         // quick game
+        if (outside) { route = "hitch"; keys = [carrier, [catchU + 1.5, startV], [catchU, startV - side * 0.8]]; catchV = startV - side * 0.8; }
+        else { route = "slant"; keys = [carrier, [los + 2, startV], [catchU, startV - side * 5]]; catchV = startV - side * 5; }
+      } else if (air <= 14) {                                 // intermediate
+        if (outside && (h % 3)) { route = "out"; keys = [carrier, [catchU - 1, startV], [catchU, startV + side * 1.2], [catchU, clampV(wideV + side * 3)]]; catchV = clampV(wideV + side * 3); }
+        else if (outside) { route = "curl"; keys = [carrier, [catchU + 2.5, startV], [catchU + 1.5, startV - side * 1.5], [catchU, startV - side * 2.5]]; catchV = startV - side * 2.5; }
+        else { route = "dig"; keys = [carrier, [catchU - 1, startV], [catchU, startV - side * 2], [catchU, inside - side * 10]]; catchV = inside - side * 10; }
+      } else if (air <= 24) {                                 // deep intermediate
+        if (outside) { route = "corner"; const br = los + Math.min(12, air * 0.55); keys = [carrier, [br, startV - side * 1.5], [br + 2, startV - side * 1], [catchU, clampV(startV + side * 6)]]; catchV = clampV(startV + side * 6); }
+        else { route = "post"; const br = los + Math.min(12, air * 0.55); keys = [carrier, [br, startV], [br + 2, startV - side * 1], [catchU, startV - side * 8]]; catchV = startV - side * 8; }
+      } else {                                                // shot plays
+        if (outside) { route = "go"; keys = [carrier, [los + 4, startV + side * 0.6], [los + 12, startV + side * 1.2], [catchU, startV + side * 0.4]]; catchV = startV + side * 0.4; }
+        else { route = "seam-post"; keys = [carrier, [los + 10, startV], [los + 15, startV - side * 1.5], [catchU, startV - side * 6]]; catchV = startV - side * 6; }
+      }
+      catchKey = keys.length - 1;
+      // run after the catch: turn upfield, then weave toward the real end spot
+      const yac = end - catchU;
+      if (yac > 1.5) {
+        const mid = clampV(catchV + (26.65 - catchV) * 0.35 + alt * 2.5);
+        if (yac > 6) keys.push([catchU + yac * 0.35, mid]);
+        if (yac > 15) keys.push([catchU + yac * 0.7, clampV(mid - alt * 4)]);
+        keys.push([end, clampV((keys[keys.length - 1][1] + catchV) / 2)]);
+      }
     }
-    return {p, los, end, O, X, qb, carrier, path, ball};
+    // dense smooth path; remember where the catch happens on it
+    const sm = smooth(keys, p.type === "run" ? 3.5 : 1.8, p.type === "run" ? 4 : catchKey + 1), path = sm.out;
+    const catchIdx = catchKey >= 0 ? sm.at[catchKey] : -1;
+    const ball = catchKey >= 0 ? [qb, keys[catchKey]] : null;
+    return {p, los, end, O, X, qb, carrier, path, ball, catchIdx, route};
   }
   function seg(path) { let d = [0]; for (let i = 1; i < path.length; i++) d.push(d[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1])); return d; }
   function along(path, cum, f) {
@@ -118,6 +181,8 @@
     }
     return [...path[path.length - 1], path.length - 1];
   }
+  // players accelerate off the line, then settle into a run; f is the share of the path covered
+  const ease = t => t <= 0 ? 0 : t >= 1 ? 1 : 0.55 * t + 0.45 * (t * t * (3 - 2 * t));
 
   const DRAW = 4800, HOLD = 2600, FADE = 900, CYCLE = DRAW + HOLD + FADE;
   function frame(now) {
@@ -128,7 +193,7 @@
     if (!t0) t0 = now;
     let el = now - t0;
     if (el > CYCLE) { idx = (idx + 1) % plays.length; t0 = now; el = 0; caption(); }
-    paint(plays[idx], Math.min(1, el / DRAW), el > DRAW + HOLD ? 1 - (el - DRAW - HOLD) / FADE : 1);
+    paint(plays[idx], ease(Math.min(1, el / DRAW)), el > DRAW + HOLD ? 1 - (el - DRAW - HOLD) / FADE : 1);
     raf = requestAnimationFrame(frame);
   }
   function paint(play, f, alpha) {
@@ -159,17 +224,24 @@
     let ballAt = [hu, hv];
     if (play.ball) {
       const [q, c] = play.ball;
-      const fc = cum[2] / cum[cum.length - 1];                       // receiver reaches the catch spot
+      const fc = cum[play.catchIdx] / cum[cum.length - 1];          // receiver reaches the catch spot
       const air = Math.hypot(c[0] - q[0], c[1] - q[1]);
-      const flight = Math.min(fc - 0.04, Math.max(0.1, Math.min(0.3, air / 55 * 0.3)));
+      // flight time in path-fraction terms: ~0.9s for a short throw, ~2.2s for a bomb, never before the snap
+      const flight = Math.min(fc - 0.03, Math.max(0.12, Math.min(0.42, (0.35 + air / 30) / (DRAW / 1000))));
       const launch = fc - flight;
+      const arc = (t) => { const u = q[0] + (c[0] - q[0]) * t, v = q[1] + (c[1] - q[1]) * t;
+        // a little loft, drawn as a sideways bow so it reads as a thrown ball from above
+        const bow = Math.sin(Math.PI * t) * Math.min(3, air * 0.06); const n = Math.hypot(c[0] - q[0], c[1] - q[1]) || 1;
+        return [u - (c[1] - q[1]) / n * bow, v + (c[0] - q[0]) / n * bow]; };
       let bu = q[0], bv = q[1];
       if (f >= fc) { bu = hu; bv = hv; }
-      else if (f >= launch) { const t = (f - launch) / flight; bu = q[0] + (c[0] - q[0]) * t; bv = q[1] + (c[1] - q[1]) * t; }
+      else if (f >= launch) { [bu, bv] = arc((f - launch) / flight); }
       if (f >= launch) {
-        const to = f >= fc ? c : [bu, bv];
+        const tEnd = f >= fc ? 1 : (f - launch) / flight;
         ctx.setLineDash([3, 7]); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(...P(...q)); ctx.lineTo(...P(...to)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(...P(...q));
+        for (let i = 1; i <= 16; i++) ctx.lineTo(...P(...arc(tEnd * i / 16)));
+        ctx.stroke(); ctx.setLineDash([]);
       }
       ballAt = [bu, bv];
     }
@@ -178,7 +250,7 @@
     for (let i = 1; i < k; i++) ctx.lineTo(...P(...play.path[i]));
     ctx.lineTo(...P(hu, hv)); ctx.stroke();
     // arrowhead at the current spot
-    const prev = k > 0 ? play.path[k - 1] : play.path[0];
+    const prev = play.path[Math.max(0, k - 3)];
     const [px, py] = P(...prev), [hx, hy] = P(hu, hv), ang = Math.atan2(hy - py, hx - px), ah = r * 1.6;
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - ah * Math.cos(ang - 0.45), hy - ah * Math.sin(ang - 0.45));
     ctx.moveTo(hx, hy); ctx.lineTo(hx - ah * Math.cos(ang + 0.45), hy - ah * Math.sin(ang + 0.45)); ctx.stroke();
@@ -221,5 +293,6 @@
   fetch("data/plays.json?t=" + (Date.now() / 3600000 | 0)).then(r => r.json()).then(d => {
     plays = (d.plays || []).map(build);
     idx = 0; caption(); size(); start();
+    window.__fieldShow = (i, f) => { idx = i % plays.length; caption(); paint(plays[idx], f, 1); };   // for screenshots/tests
   }).catch(() => { cap.hidden = true; });
 })();
