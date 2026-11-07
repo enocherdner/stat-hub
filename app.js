@@ -898,7 +898,7 @@ V.roster = () => {
   <div class="row" style="margin-top:8px"><button class="btn" data-act="paste">Add names</button><button class="btn ghost" data-act="clear">Clear roster</button></div>
   <p id="pastemsg" class="small muted"></p>
   <h2>Look</h2><div class="seg">${["gameday","classic"].map(x => `<button class="chip ${(document.documentElement.dataset.look || "gameday") === x ? "on" : ""}" data-theme="${x}">${x === "gameday" ? "Gameday" : "Classic purple"}</button>`).join("")}</div>
-  <h2>Text colors</h2><div class="seg">${[["swap","White names, purple stats"],["ice","White names, neon blue stats"],["orig","Purple names, white stats"]].map(([x, l]) => `<button class="chip ${(document.documentElement.dataset.ink || "ice") === x ? "on" : ""}" data-ink="${x}">${l}</button>`).join("")}</div>`;
+  <h2>Text colors</h2><div class="seg">${[["swap","White names, purple stats"],["ice","White names, neon blue stats"],["orig","Purple names, white stats"]].map(([x, l]) => `<button class="chip ${(document.documentElement.dataset.ink || "ice") === x ? "on" : ""}" data-setink="${x}">${l}</button>`).join("")}</div>`;
 };
 
 /* ---------------- the "Ask" button (the only place Claude is involved) ---------------- */
@@ -1024,14 +1024,14 @@ let lastHash = "";
 window.addEventListener("hashchange", () => { if (location.hash.split("/")[1] !== lastHash.split("/")[1] || location.hash.startsWith("#/p") || location.hash.startsWith("#/c")) scrollTo(0, 0); lastHash = location.hash; render(); });
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-ink],[data-ssg],[data-mxs],[data-wpos],[data-own],[data-sched]");
+  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-setink],[data-ssg],[data-mxs],[data-wpos],[data-own],[data-sched]");
   if (!t) return;
   if (t.dataset.pos) { V.home.pos = t.dataset.pos; render(); return; }
   if (t.dataset.view) { V.home.view = t.dataset.view; render(); return; }
   if (t.dataset.mxs) { V.mx = {sort: t.dataset.mxs}; render(); return; }
   if (t.dataset.wpos) { V.wPos = t.dataset.wpos; render(); return; }
   if (t.dataset.own) { try { localStorage.setItem("ownMax", t.dataset.own); } catch {} render(); return; }
-  if (t.dataset.ink) { try { localStorage.setItem("ink", t.dataset.ink); } catch {} document.documentElement.dataset.ink = t.dataset.ink; render(); return; }
+  if (t.dataset.setink) { try { localStorage.setItem("ink", t.dataset.setink); } catch {} document.documentElement.dataset.ink = t.dataset.setink; render(); return; }
   if (t.dataset.theme) { try { localStorage.setItem("theme", t.dataset.theme); } catch {} document.documentElement.dataset.look = t.dataset.theme; render(); window.dispatchEvent(new Event("resize")); document.dispatchEvent(new Event("visibilitychange")); return; }
   if (t.dataset.nf) { V.news.f = t.dataset.nf; render(); return; }
   if (t.dataset.rm) { V[t.dataset.rm] = V[t.dataset.rm].filter(x => x !== t.dataset.id); if (t.dataset.rm === "rIds") setRoster(V.rIds); render(); return; }
