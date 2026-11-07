@@ -919,6 +919,9 @@ function askTrade() {
 
 /* ---------------- written analysis (Claude, only when he asks; cached per player set per day) ---------------- */
 const ANA = {};   // key -> {status, text, ...}
+// Where write-ups get made: the iMac serves the site itself (same origin); on the public site the MacBook runs
+// the same service at localhost:8766 (stathub serve, launchd com.enoch.stathub-serve). The phone has neither.
+const API = /github\.io$/.test(location.hostname) ? "http://localhost:8766" : "";
 function anaKey(kind, ids) { return kind + ":" + (kind === "compare" ? [...ids].sort() : ids).join(","); }
 function anaPanel(kind, ids, auto) {
   const k = anaKey(kind, ids), st = ANA[k];
@@ -928,7 +931,7 @@ function anaPanel(kind, ids, auto) {
     : `<button class="btn" data-act="ana" data-kind="${kind}">Write the analysis</button> <span class="muted small">about 30–60 seconds; checks this week's injury news</span>`;
   else if (st.status === "working") inner = `<p class="muted small"><span class="spin"></span>Writing it now: pulling this week's injury and news context, then reading the numbers. About 30–60 seconds.</p>`;
   else if (st.status === "error") inner = `<p class="small v-bad">${esc(st.error || "Couldn't write it.")}</p><button class="btn ghost sm" data-act="ana" data-kind="${kind}">Try again</button>`;
-  else if (st.status === "offline") inner = `<p class="small muted">New write-ups are made by the iMac. At home, open <a href="http://192.168.68.62:8765/${location.hash}">the iMac version</a> to write this one; ones already written show up here too.</p>`;
+  else if (st.status === "offline") inner = `<p class="small muted">New write-ups are made on your MacBook or the iMac. Open this page on the MacBook (any network), or at home open <a href="http://192.168.68.62:8765/${location.hash}">the iMac version</a>. Ones already written show up here too.</p>`;
   else inner = md(st.text) + `<p class="note">Written ${when(st.at)} from the numbers ${kind === "profile" ? "on this page" : "above"} plus a web check of injuries and news. Saved ${kind === "profile" ? "until next week's stats land" : "for today"}, so reopening it is free.</p>`;
   return `<div class="ana" id="ana" data-kind="${kind}" data-ids="${ids.join(",")}"><div class="lbl">${label}</div>${inner}</div>`;
 }
@@ -948,7 +951,7 @@ async function anaCheck(kind, ids, auto) {
   const k = anaKey(kind, ids);
   if (ANA[k] && ANA[k].status !== "none") { if (ANA[k].status === "working") anaPoll(kind, ids); return; }
   try {
-    const r = await fetch(`/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`);
+    const r = await fetch(`${API}/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`);
     if (!r.ok) throw 0;
     ANA[k] = await r.json();
   } catch { ANA[k] = await published(kind, ids); }
@@ -974,7 +977,7 @@ async function anaStart(kind, ids) {
   const names = ids.map(id => BY[id]?.name || id);
   ANA[k] = {status: "working"}; refreshAna(kind, ids);
   try {
-    const r = await fetch("/api/analysis", {method: "POST", headers: {"Content-Type": "application/json"},
+    const r = await fetch(`${API}/api/analysis`, {method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({kind, ids, names, numbers: nums})});
     if (!r.ok) throw 0;
     ANA[k] = await r.json();
@@ -986,7 +989,7 @@ function anaPoll(kind, ids) {
   const k = anaKey(kind, ids);
   clearTimeout(anaPoll.t);
   anaPoll.t = setTimeout(async () => {
-    try { const r = await fetch(`/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`); ANA[k] = await r.json(); } catch {}
+    try { const r = await fetch(`${API}/api/analysis?kind=${kind}&ids=${encodeURIComponent(ids.join(","))}`); ANA[k] = await r.json(); } catch {}
     refreshAna(kind, ids);
     if (ANA[k]?.status === "working") anaPoll(kind, ids);
   }, 3000);
