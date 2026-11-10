@@ -1128,7 +1128,7 @@ function expertWaivers(posF, hide, mine, maxOwn) {
   const body = list.slice(0, 40).map((e, i) => {
     const p = e.id ? BY[e.id] : null;
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(p.name)}</b></a>` : `<b>${esc(e.name)}</b>`;
-    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="muted">Expert:</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("");
+    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="muted">Expert:</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("") + (e.flag ? `<div class="tiny" style="margin-top:4px;color:var(--bad,#e5484d)"><b>Update:</b> ${esc(e.flag)}</div>` : "");
     const n = Object.keys(e.srcs).length;
     return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} <span class="muted small">${esc(e.pos || "")} · ${esc(e.team || "")}</span> ${ownBadge(e.own)} ${p ? injBadge(p) : ""} ${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}${notes}</span>
       <span class="r"><b>${n}</b><br><span class="muted tiny">expert${n === 1 ? "" : "s"}</span></span></div>`;
