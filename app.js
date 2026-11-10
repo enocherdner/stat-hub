@@ -633,15 +633,16 @@ function stamp() {
 
 const LIST_LEN = {QB: 36, RB: 60, WR: 72, TE: 36, FLEX: 100, K: 32, DEF: 32};
 const MIN_GP = 3;
-function rnk(i) { return `<span class="rk ${i === 0 ? "gold" : ""}">${i + 1}</span>`; }
+function rnk(i) { return `<span class="rk ${["gold", "silver", "bronze"][i] || ""}">${i + 1}</span>`; }
 V.home = () => {
   setTab("home");
   const view = V.home.view || "wk";
   const pos = V.home.pos || "RB";
-  const sub = `<div class="subtabs"><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Best matchups ROS</button></div>`;
+  const sub = `<div class="subtabs"><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Best matchups ROS</button><button class="${view === "rw" ? "on" : ""}" data-view="rw">🏆 Record watch</button></div>`;
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
   const mxPos = pos === "FLEX" ? "RB" : pos;
   const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
+  if (view === "rw") return `<h1>Rankings</h1>${sub}${recordWatch()}`;
   return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + tabSearch("rank", "Search this list…") + (view === "ros" ? rosList(pos) : view === "wk" ? weeklyList(pos) : ppgList(pos))}${stamp()}`;
 };
 function ppgList(pos) {
@@ -661,7 +662,7 @@ function ppgList(pos) {
 }
 function ppgTable(ps) {
   return `<table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>GP</th><th>Total</th><th>PPG</th><th>Snap%</th><th>Car/g</th><th>Tgt/g</th><th>Share</th><th>RZ/g</th><th>TD</th><th>xTD</th><th>Flag</th></tr></thead><tbody>
-  ${ps.map((p, i) => { const S = summary(p.id), a = S.s, L = (D.luck.players || {})[p.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)}</td><td>${p.pos}</td><td>${p.team}</td><td>${p.gp}</td><td>${f1(sum(weeks(p.id), "pts"))}</td><td><b>${f1(p.ppg)}</b></td><td>${pct(a.snp)}</td><td>${f1(a.car / a.g)}</td><td>${f1(a.tgt / a.g)}</td><td>${p.pos === "QB" ? "–" : pct(share(p.pos, a))}</td><td>${f1(a.rz / a.g)}</td><td>${a.rtd + a.rectd + (p.pos === "QB" ? a.ptd : 0)}</td><td>${L ? L[0].toFixed(1) : "–"}</td><td>${luckTag(p.id)}</td></tr>`; }).join("")}</tbody></table>`;
+  ${ps.map((p, i) => { const S = summary(p.id), a = S.s, L = (D.luck.players || {})[p.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${recBadge(p.id)} ${injBadge(p)}</td><td>${p.pos}</td><td>${p.team}</td><td>${p.gp}</td><td>${f1(sum(weeks(p.id), "pts"))}</td><td><b>${f1(p.ppg)}</b></td><td>${pct(a.snp)}</td><td>${f1(a.car / a.g)}</td><td>${f1(a.tgt / a.g)}</td><td>${p.pos === "QB" ? "–" : pct(share(p.pos, a))}</td><td>${f1(a.rz / a.g)}</td><td>${a.rtd + a.rectd + (p.pos === "QB" ? a.ptd : 0)}</td><td>${L ? L[0].toFixed(1) : "–"}</td><td>${luckTag(p.id)}</td></tr>`; }).join("")}</tbody></table>`;
 }
 function kRow(k, i) {
   return `<div class="pl">${rnk(i)}${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · ${k.gp} gp · <b class="ink2">${f1(k.ppg * k.gp)}</b> total pts · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
@@ -742,7 +743,7 @@ function weeklyList(pos) {
     const ffb = (r.ffb || []).slice(0, 1).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, true)} <span class="ink2">${esc(t.note)}</span></div>`).join("");
     const oth = (r.other || []).slice(0, 2).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, false)} <span class="muted">${esc(t.note)}</span></div>`).join("");
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
-    return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${injBadge(p)} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
+    return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${recBadge(p.id)} ${injBadge(p)} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
       <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")} · ${srcs}${actTxt}${p.gp ? ` · season ${f1(sum(weeks(p.id), "pts"))} pts` : ""}</span>${ffb}${oth}</span>
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj * scF(r.id))}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
@@ -750,6 +751,38 @@ function weeklyList(pos) {
   return `<p class="small"><b>Week ${T} rankings</b> <span class="muted">· games ${weekDates(T)} ·</span> <b>Expert consensus</b></p>
   <div class="card list">${body}</div>
   <p class="note">Sources: ${esc([...(ffbN ? ["Fantasy Footballers"] : []), ...(C.sources || [])].join(", "))}. Proj pts = the sources' average. Updated ${ago(C.updated)}.</p>`;
+}
+
+/* ---------------- record watch: chasing history, this week's big games, milestones (no Claude) ---------------- */
+const fmtN = n => Math.round(n).toLocaleString();
+function bigFor(id) { return ((D.records || {}).big || []).find(b => b.id === id); }
+function recBadge(id) {
+  const b = bigFor(id); if (!b) return "";
+  const txt = [...b.feats, ...b.highs].join(", ");
+  return tipTag("trophy", "🏆", `${b.name}, week ${D.records.week} vs ${b.opp}: ${txt}.`);
+}
+function recordWatch() {
+  const R = D.records; if (!R || !R.pace) return `<p class="muted">Record watch isn't loaded yet.</p>`;
+  const link = (id, name) => BY[id] ? `<a href="#/p/${id}"><b>${esc(name)}</b></a>` : `<b>${esc(name)}</b>`;
+  const pace = R.pace.map(c => {
+    const rows = c.chasers.map((x, i) => {
+      const f = Math.min(1, x.pace / c.record), on = x.pace >= c.record;
+      return `<div class="rw-row">${rnk(i)}<span class="grow">${link(x.id, x.name)} <span class="muted small">${esc(x.pos)} · ${esc(x.team)}</span>
+        <div class="bar"><i style="width:${(f * 100).toFixed(1)}%" class="${on ? "on" : ""}"></i></div>
+        <span class="small ${on ? "v-good" : "ink2"}">${on ? "<b>On record pace:</b> " : ""}${fmtN(x.total)} so far · on pace for <b>${fmtN(x.pace)}</b>${on ? "" : ` · ${fmtN(c.record - x.pace)} short`}</span></span></div>`;
+    }).join("");
+    return `<div class="card"><div class="row"><b>${esc(c.label)}</b><span class="muted small" style="margin-left:auto">Record ${fmtN(c.record)} · ${esc(c.holder)}, ${c.year}</span></div>${rows}</div>`;
+  }).join("");
+  const big = (R.big || []).map((b, i) => `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
+    ${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span></div>`).join("");
+  const miles = (R.milestones || []).map(m => `<div class="pl"><span class="grow">${link(m.id, m.name)} <span class="muted small">${esc(m.pos)} · ${esc(m.team)}</span><br>
+    <span class="small ink2">${m.first ? `<b>${esc(m.label)}</b>: ${fmtN(m.total)} so far, ${fmtN(m.need)} to go` : `<b>${fmtN(m.need)}</b> ${esc(m.label.toLowerCase())} from <b>${fmtN(m.milestone)}</b> career (${fmtN(m.total)} now)`}</span></span>
+    <span class="r"><b>~${m.games}</b><br><span class="muted tiny">game${m.games === 1 ? "" : "s"}</span></span></div>`).join("");
+  return `<p class="small"><b>Record watch</b> <span class="muted">· ${R.season} season through week ${R.week}</span></p>
+  <h2>Chasing history</h2><p class="muted small">Single-season NFL records and the closest chasers, on a 17-game pace.</p>${pace}
+  <h2>Week ${R.week} big games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
+  <h2>Milestones coming up</h2><div class="card list">${miles || '<p class="muted">Nobody close to a milestone right now.</p>'}</div>
+  <p class="note">Career numbers and career highs use regular-season games since ${R.since}. Records are the official NFL single-season marks.</p>`;
 }
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
@@ -799,7 +832,7 @@ function rosList(pos) {
   <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
 }
 function plRow(p, i) {
-  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)} ${typeof i === "number" ? luckTag(p.id) : ""}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}${typeof i === "number" && p.gp ? ` · <b class="ink2">${f1(sum(weeks(p.id), "pts"))}</b> total pts` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
+  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${recBadge(p.id)} ${injBadge(p)} ${typeof i === "number" ? luckTag(p.id) : ""}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}${typeof i === "number" && p.gp ? ` · <b class="ink2">${f1(sum(weeks(p.id), "pts"))}</b> total pts` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
 }
 
 function statTiles(p, a, n) {
@@ -866,7 +899,7 @@ function newsCard(c, n = 4, link = true) {
   const p = BY[c.pid] || c;
   const [first, ...rest] = c.items;
   return `<div class="card news">
-    <div class="row">${link ? `<a href="#/p/${c.pid}" class="row" style="color:var(--ink)">${head(p, 32)}<b>${esc(p.name || c.name)}</b></a>` : ""}<span class="muted small">${esc(p.pos || c.pos)} · ${esc(p.team || c.team)}</span> ${BY[c.pid] ? injBadge(BY[c.pid]) : ""}<span class="muted small" style="margin-left:auto">${ago(c.updated)}</span></div>
+    <div class="row">${link ? `<a href="#/p/${c.pid}" class="row" style="color:var(--ink)">${head(p, 32)}<b>${esc(p.name || c.name)}</b></a> ${recBadge(c.pid)}` : ""}<span class="muted small">${esc(p.pos || c.pos)} · ${esc(p.team || c.team)}</span> ${BY[c.pid] ? injBadge(BY[c.pid]) : ""}<span class="muted small" style="margin-left:auto">${ago(c.updated)}</span></div>
     <div class="item" style="border:0;margin-top:6px;padding-top:0"><div class="head">${esc(first.head)}</div>${first.body && first.body !== first.head ? `<div class="ink2 small">${esc(first.body)}</div>` : ""}
     <div class="tiny muted">Broke ${when(first.t)} · ${esc(first.src)}${c.sources.length > 1 ? ` · also ${esc(c.sources.filter(s => s !== first.src).join(", "))}` : ""}${first.url ? ` · <a href="${esc(first.url)}" target="_blank" rel="noopener">source</a>` : ""}</div></div>
     ${rest.slice(0, n - 1).map(i => `<div class="item"><div class="small"><b>${esc(i.head)}</b></div><div class="tiny muted">${when(i.t)} · ${esc(i.src)}</div></div>`).join("")}
@@ -882,7 +915,7 @@ V.player = id => {
   const mine = roster().includes(id);
   return `
   <div class="hero">${p.head ? `<img src="${esc(p.head)}" alt="">` : `<span style="width:72px;height:72px;border-radius:50%;background:var(--panel2)"></span>`}
-    <div class="grow"><h1>${esc(p.name)}</h1>
+    <div class="grow"><h1>${esc(p.name)} ${recBadge(id)}</h1>
     <div class="muted">${p.pos} · ${p.team}${p.num ? " #" + p.num : ""}${p.age ? " · age " + p.age : ""}${p.yrs != null ? " · yr " + (p.yrs + 1) : ""}</div>
     <div style="margin-top:4px">${injBadge(p)} ${nxt ? `<span class="badge">Wk ${nxt[0]} ${nxt[2] ? "vs" : "@"} ${nxt[1]}</span>` : ""}</div></div></div>
   <div class="row wrap" style="margin:12px 0">
@@ -1104,6 +1137,7 @@ V.news = () => {
   <p class="muted small">Updated ${ago(D.news.updated)}.</p>
   ${tabSearch("news", "Search news: player, team…")}
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
+  ${nv === "top" && (D.records?.big || []).length ? `<a class="card trophycard" href="#/rankings" data-view="rw"><b>🏆 Week ${D.records.week} big games</b><div class="small ink2" style="margin-top:4px">${D.records.big.slice(0, 4).map(b => `<b>${esc(b.name)}</b>: ${esc([...b.highs.map(h => h.replace(/ \(.*\)/, "")), ...b.feats].slice(0, 2).join(", "))}`).join(" · ")}</div><div class="tiny muted" style="margin-top:4px">See Record watch →</div></a>` : ""}
   <div class="news-grid">${cards.slice(0, 300).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
 
@@ -1391,6 +1425,7 @@ document.addEventListener("click", e => {
     D.wcons = await load("waiver_consensus").catch(() => ({players: []}));
     D.luck = await load("luck").catch(() => ({players: {}}));
     D.waivers = await load("waivers").catch(() => ({players: []}));
+    D.records = await load("records").catch(() => ({}));
     buildKDefDvp();
     applyScoring();
   } catch (e) {

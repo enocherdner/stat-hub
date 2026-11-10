@@ -285,3 +285,14 @@ td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;
 .tabsearch input{width:100%;box-sizing:border-box;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:500 14px Inter,system-ui,sans-serif}
 .tabsearch input::placeholder{color:var(--muted)}
 [hidden]{display:none!important}
+
+.rk.silver{color:#121417!important;-webkit-text-fill-color:#121417;background:#c9d1dc;border-radius:8px;padding:3px 0;box-shadow:0 0 0 2px rgba(201,209,220,.25);text-shadow:none}
+.rk.bronze{color:#1d0f04!important;-webkit-text-fill-color:#1d0f04;background:#cd7f32;border-radius:8px;padding:3px 0;box-shadow:0 0 0 2px rgba(205,127,50,.25);text-shadow:none}
+.trophy{cursor:help;margin-left:2px}
+.trophy .ib{display:none}
+.rw-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.rw-row:first-of-type{border-top:0}
+.bar{height:6px;border-radius:4px;background:rgba(255,255,255,.1);margin:5px 0 4px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#7c5cff,#a78bfa)}
+.bar i.on{background:linear-gradient(90deg,#f5c542,#ffde7a)}
+.trophycard{display:block;color:var(--ink);border-color:rgba(245,197,66,.55);background:linear-gradient(90deg,rgba(245,197,66,.14),rgba(167,139,250,.08))}
