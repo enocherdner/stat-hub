@@ -109,7 +109,7 @@
   const clampV = v => Math.max(2, Math.min(Wd - 2, v));
   function build(p) {
     const los = 10 + (100 - p.start);                       // offense drives toward u = 120
-    const end = Math.min(los + p.yds, p.td ? 114 : 109.5);
+    const end = p.td ? 114 : Math.min(los + p.yds, 109.5);   // scores finish 4 yards deep in the end zone
     const h = hash(p), alt = (h & 1) ? 1 : -1;
     const O = [22.3, 24.5, 26.65, 28.8, 31].map(v => [los - 0.7, v]);
     const X = [[los + 1.2, 21.5], [los + 1.2, 24.5], [los + 1.2, 28.8], [los + 1.2, 31.8],
@@ -122,15 +122,15 @@
       const gapV = p.loc === "middle" ? 26.65 + alt * 1.5 : 26.65 + toward * (p.gap === "end" ? 9 : p.gap === "tackle" ? 5 : 2.5);
       const yds = end - los;
       // mesh with the QB, press the gap, plant and cut upfield, then a second cut / bend in the open field
-      keys = [carrier, [los - 3.5, 26.65 + toward * 1.2], [los - 0.8, gapV], [los + 2.5, gapV + toward * 0.6]];
+      // real: the gap and side. Drawn: through that gap, then straight up that side of the field
+      // (no invented cutbacks).
+      keys = [carrier, [los - 3.5, 26.65 + toward * 1.2], [los - 0.8, gapV], [los + 2.5, gapV + toward * 0.4]];
       if (yds > 8) {
-        const cut = clampV(gapV - toward * 4 * (alt > 0 ? 1 : 0.5));           // cutback or bounce
-        keys.push([los + Math.min(8, yds * 0.25), cut]);
-        const lane = clampV(p.loc === "middle" ? 26.65 + alt * 9 : 26.65 + toward * 13);
-        keys.push([los + yds * 0.55, (cut + lane) / 2]);
-        keys.push([los + yds * 0.8, lane]);
+        const lane = clampV(p.loc === "middle" ? gapV : 26.65 + toward * Math.min(16, 5 + yds * 0.12));
+        keys.push([los + Math.min(10, yds * 0.3), (gapV + lane) / 2]);
+        keys.push([los + yds * 0.7, lane]);
       }
-      keys.push([end, clampV(keys[keys.length - 1][1] + (p.td ? -toward * 2 : toward * 2))]);
+      keys.push([end, keys[keys.length - 1][1]]);
       route = "run";
     } else {
       qb = [los - 7, 26.65];                                 // shotgun drop
@@ -159,11 +159,10 @@
       catchKey = keys.length - 1;
       // run after the catch: turn upfield, then weave toward the real end spot
       const yac = end - catchU;
-      if (yac > 1.5) {
-        const mid = clampV(catchV + (26.65 - catchV) * 0.35 + alt * 2.5);
-        if (yac > 6) keys.push([catchU + yac * 0.35, mid]);
-        if (yac > 15) keys.push([catchU + yac * 0.7, clampV(mid - alt * 4)]);
-        keys.push([end, clampV((keys[keys.length - 1][1] + catchV) / 2)]);
+      if (yac > 1.5) {                                        // turn upfield and run it out on that side
+        const lane = clampV(catchV + (26.65 - catchV) * 0.2);
+        if (yac > 6) keys.push([catchU + Math.min(5, yac * 0.3), lane]);
+        keys.push([end, lane]);
       }
     }
     // dense smooth path; remember where the catch happens on it
@@ -292,7 +291,7 @@
   size();
   fetch("data/plays.json?t=" + (Date.now() / 3600000 | 0)).then(r => r.json()).then(d => {
     plays = (d.plays || []).map(build);
-    idx = 0; caption(); size(); start();
+    idx = Math.floor(Math.random() * plays.length); caption(); size(); start();   // start somewhere new each visit
     window.__fieldShow = (i, f) => { idx = i % plays.length; caption(); paint(plays[idx], f, 1); };   // for screenshots/tests
   }).catch(() => { cap.hidden = true; });
 })();
