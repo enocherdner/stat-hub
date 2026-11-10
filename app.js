@@ -1014,7 +1014,7 @@ V.news = () => {
   else if (filt !== "all") cards = cards.filter(c => (BY[c.pid]?.pos || c.pos) === filt);
   return `<h1>News</h1>
   <div class="subtabs"><button class="${nv === "top" ? "on" : ""}" data-nv="top">Top news (${nTop})</button><button class="${nv === "all" ? "on" : ""}" data-nv="all">All news</button></div>
-  <p class="muted small">${nv === "top" ? "Injuries, practice reports, IR, trades, signings, releases and role or depth-chart changes." : "Everything, including game recaps."} One card per player. Updated ${ago(D.news.updated)}.</p>
+  <p class="muted small">${nv === "top" ? "Injuries, practice reports, IR, trades, signings, releases and role or depth-chart changes." : "Everything, including game recaps."} Updated ${ago(D.news.updated)}.</p>
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
   <div class="news-grid">${cards.slice(0, 120).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
