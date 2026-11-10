@@ -287,7 +287,7 @@ function projectX(id, wk) {
   x.ours = ours; x.expert = e.proj; x.proj = blend;
   x.floor = ours > 0 ? x.floor * k : blend * 0.75; x.ceil = ours > 0 ? x.ceil * k : blend * 1.25;
   const pos = x.p.pos;
-  const srcs = [e.fp && `FantasyPros ${pos}${e.fp}`, e.rw && `RotoWire ${pos}${e.rw}`, e.es && `ESPN ${pos}${e.es}`].filter(Boolean).join(", ");
+  const srcs = [e.ffbr && `Footballers ${pos}${e.ffbr}`, e.fp && `FantasyPros ${pos}${e.fp}`, e.rw && `RotoWire ${pos}${e.rw}`, e.es && `ESPN ${pos}${e.es}`].filter(Boolean).join(", ");
   const add = [{t: `Expert consensus: ${pos}${e.crank} this week (${srcs}), ${f1(e.proj)} pts. Our numbers: ${f1(ours)}. Blended 60/40 = ${f1(blend)}`, pos: e.proj > ours * 1.1, neg: e.proj < ours * 0.9}];
   for (const t of e.ffb || []) add.push({t: `🎙 Footballers: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
   for (const t of (e.other || []).slice(0, 2)) add.push({t: `${t.src}: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`});
@@ -596,7 +596,7 @@ function weeklyList(pos) {
     const w = weeks(p.id).find(x => x.wk === T);
     const act = w ? w.pts : null;
     const ez = oppid ? easeTag((D.teams.dvp[oppid] || {})[ppos], ppos) : "";
-    const srcs = [r.fp && `FantasyPros ${ppos}${r.fp}`, r.rw && `RotoWire ${ppos}${r.rw}`, r.es && `ESPN ${ppos}${r.es}`].filter(Boolean).join(" · ");
+    const srcs = [r.ffbr && `🎙 Footballers ${ppos}${r.ffbr}`, r.fp && `FantasyPros ${ppos}${r.fp}`, r.rw && `RotoWire ${ppos}${r.rw}`, r.es && `ESPN ${ppos}${r.es}`].filter(Boolean).join(" · ");
     const ffb = (r.ffb || []).slice(0, 1).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, true)} <span class="ink2">${esc(t.note)}</span> <a class="muted" href="${esc(t.link)}" target="_blank" rel="noopener">source</a></div>`).join("");
     const oth = (r.other || []).slice(0, 2).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, false)} <span class="muted">${esc(t.note)}</span></div>`).join("");
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
@@ -605,7 +605,7 @@ function weeklyList(pos) {
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj)}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const ffbN = (C.ffb || []).length;
-  return `<p class="muted small"><b>Week ${T} rankings</b> (games ${weekDates(T)}) · expert consensus · ${esc((C.sources || []).join(" + "))}${ffbN ? ` + Fantasy Footballers (${ffbN} free articles/episodes so far)` : " · Fantasy Footballers' takes get added as their articles and episodes come out"}. FantasyPros counts double. A Footballers START/LIKE moves a player up and a SIT/FADE moves him down. Proj pts = the average of the sources. Updated ${ago(C.updated)}.</p>
+  return `<p class="muted small"><b>Week ${T} rankings</b> (games ${weekDates(T)}) · expert consensus · ${esc((C.sources || []).join(" + "))}${ffbN ? ` + Fantasy Footballers (${ffbN} free articles/episodes so far)` : " · Fantasy Footballers' takes get added as their articles and episodes come out"}. FantasyPros and the Footballers' own ranks (from their free Rankings Audit) count double. A Footballers START/LIKE moves a player up and a SIT/FADE moves him down. It recalculates every 15 minutes as new rankings, articles and their podcast come out. Proj pts = the average of the sources. Updated ${ago(C.updated)}.</p>
   <div class="card list">${body}</div>
   ${ffbN ? `<p class="note">Footballers sources: ${(C.ffb || []).map(a => `<a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>`).join(" · ")}</p>` : ""}`;
 }
