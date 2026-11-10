@@ -310,3 +310,6 @@ table.rt tbody td{background:var(--panel);border-top:1px solid var(--line);borde
 table.rt tbody td:first-child{border-left:1px solid var(--line);border-radius:10px 0 0 10px}
 table.rt tbody td:last-child{border-right:1px solid var(--line);border-radius:0 10px 10px 0}
 .only-wide.card:has(> table.rt),.card:has(> table.rt){background:none;border:0;padding:0;box-shadow:none}
+/* the card you're typing in sits above its neighbours, so its suggestion list is never covered */
+.card:focus-within,.pick:focus-within,.tabsearch:focus-within{position:relative;z-index:50}
+.sugg{z-index:60}
