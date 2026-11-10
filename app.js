@@ -1284,7 +1284,7 @@ V.ss = () => {
   if (n >= 2) {
     const res = V.ssIds.map(id => projectX(id, wk)).sort((x, y) => y.proj - x.proj);
     V.ssLast = {wk, res, start: V.ssN};
-    out = anaPanel("startsit", [...res.map(x => x.id), "start" + V.ssN, rosterTag()], false) + `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
+    out = `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
       <div class="grow"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a> <span class="muted small">${x.p.pos} · ${x.p.team}</span> ${injBadge(x.p)}
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
