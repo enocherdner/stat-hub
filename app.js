@@ -1040,7 +1040,7 @@ function render() {
   let html;
   if (r === "p") html = V.player(a);
   else if (r === "c") html = V.compare(a, b);
-  else if (r === "news") html = V.news();
+  else if (!r || r === "news") html = V.news();   // News is the landing page
   else if (r === "waivers") html = V.waivers();
   else if (r === "ss") html = V.ss();
   else if (r === "trade") html = V.trade();
