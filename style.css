@@ -299,3 +299,14 @@ td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;
 
 .hdr-roster{flex:none;display:grid;place-items:center;width:38px;height:36px;margin-left:8px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);text-decoration:none;font-size:17px}
 @media (max-width:480px){.scoring{max-width:86px;font-size:12px;padding:7px 4px;margin-left:6px}.hdr-roster{width:34px;margin-left:6px}}
+/* each player is its own card (lists of players): the outer card becomes a plain stack */
+.card.list:has(> .pl){background:none;border:0;padding:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.card.list > .pl{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 8px;border-bottom:1px solid var(--line)}
+.card.list > .pl:last-child{border-bottom:1px solid var(--line);margin-bottom:0}
+:root[data-look="gameday"] .card.list > .pl{backdrop-filter:blur(2.5px);-webkit-backdrop-filter:blur(2.5px)}
+/* wide screens: table rows read as separate player cards too */
+table.rt{border-collapse:separate;border-spacing:0 6px}
+table.rt tbody td{background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+table.rt tbody td:first-child{border-left:1px solid var(--line);border-radius:10px 0 0 10px}
+table.rt tbody td:last-child{border-right:1px solid var(--line);border-radius:0 10px 10px 0}
+.only-wide.card:has(> table.rt),.card:has(> table.rt){background:none;border:0;padding:0;box-shadow:none}

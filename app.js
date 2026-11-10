@@ -70,8 +70,12 @@ function injBadge(p) {
   const cls = OUT.has(p.inj) ? "b-out" : (p.inj === "Questionable" || p.inj === "Doubtful") ? "b-q" : "";
   return `<span class="badge ${cls}" title="${esc(p.injn)}">${esc(p.inj)}${p.injb ? " · " + esc(p.injb) : ""}</span>`;
 }
+function headUrl(u, size) {   // NFL's image server resizes on the fly: ~2 KB instead of ~700 KB per photo
+  const px = Math.round(size * 2);
+  return u.replace("/image/upload/f_auto,q_auto/", `/image/upload/f_auto,q_auto,w_${px},h_${px},c_fill,g_face/`);
+}
 function head(p, size = 36) {
-  return p.head ? `<img src="${esc(p.head)}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;background:var(--panel2)" loading="lazy">`
+  return p.head ? `<img src="${esc(headUrl(p.head, size))}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;background:var(--panel2)" loading="lazy">`
                 : `<span style="width:${size}px;height:${size}px;border-radius:50%;background:var(--panel2);display:inline-block;flex:none"></span>`;
 }
 
@@ -914,7 +918,7 @@ V.player = id => {
   const nxt = nextGames(p.team, nextWeek())[0];
   const mine = roster().includes(id);
   return `
-  <div class="hero">${p.head ? `<img src="${esc(p.head)}" alt="">` : `<span style="width:72px;height:72px;border-radius:50%;background:var(--panel2)"></span>`}
+  <div class="hero">${p.head ? `<img src="${esc(headUrl(p.head, 72))}" alt="">` : `<span style="width:72px;height:72px;border-radius:50%;background:var(--panel2)"></span>`}
     <div class="grow"><h1>${esc(p.name)} ${recBadge(id)}</h1>
     <div class="muted">${p.pos} · ${p.team}${p.num ? " #" + p.num : ""}${p.age ? " · age " + p.age : ""}${p.yrs != null ? " · yr " + (p.yrs + 1) : ""}</div>
     <div style="margin-top:4px">${injBadge(p)} ${nxt ? `<span class="badge">Wk ${nxt[0]} ${nxt[2] ? "vs" : "@"} ${nxt[1]}</span>` : ""}</div></div></div>
