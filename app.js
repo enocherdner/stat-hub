@@ -868,7 +868,7 @@ function recapView() {
       return `<a class="pl" href="#/p/${x.p.id}">${rnk(i)}${head(x.p)}<span class="grow"><b>${esc(x.p.name)}</b> ${recBadge(x.p.id)}<br><span class="muted small">${x.p.team} ${w ? "vs " + w.opp : ""}</span>${w ? `<br><span class="small ink2">${esc(statLine(w))}</span>` : ""}</span><span class="r"><b>${f1(x.pts)}</b><br><span class="muted tiny">pts</span></span></a>`; }).join("")}</div></div>`;
   }).join("");
   return `<p class="small"><b>Week ${wk} recap</b> <span class="muted">· ${SCU()} points</span></p>
-  <h2>Top 12 games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
+  <h2>Top 12 scorers</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
   ${alsoHtml ? `<h2>Also big games</h2><div class="card list">${alsoHtml}</div>` : ""}
   <div class="cols">${top}${kd("K", kRows)}${kd("DEF", dRows)}</div>`;
 }
