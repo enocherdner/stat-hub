@@ -593,7 +593,32 @@ function schedView(pos) {
     const pool = D.players.filter(p => p.pos === pos && p.gp >= MIN_GP).slice(0, pos === "QB" || pos === "TE" ? 30 : 60);
     return pool.map(p => ({p, t: p.team, avg: ranks.rows.find(r => r.t === p.team)?.avg ?? null})).filter(x => x.avg != null).sort((a, b) => b.avg - a.avg);
   };
+  // one card per TEAM (the schedule is the team's), with the players who matter at this position right now:
+  // who's active and getting the work, and who's hurt (and so who gets the boost)
+  const ACTIVE_N = {QB: 1, RB: 2, WR: 3, TE: 1};
+  const teamRoom = t => {
+    const ps = D.players.filter(p => p.pos === pos && p.team === t && p.gp >= 1);
+    const work = p => { const S = summary(p.id); return pos === "QB" ? p.ppg : (share(pos, S.l4gp ? S.l4 : S.s) || 0) * 100 + p.ppg * 0.3; };
+    const hurt = ps.filter(p => OUT.has(p.inj) && p.ppg >= 6).sort((a, b) => b.ppg - a.ppg).slice(0, 2);
+    const active = ps.filter(p => !OUT.has(p.inj)).sort((a, b) => work(b) - work(a))
+      .filter((p, j) => j === 0 || p.ppg >= 5).slice(0, ACTIVE_N[pos] || 2);      // the lead guy, plus anyone with a real role
+    return {active, hurt};
+  };
+  const teamCard = (r, i, ranks, title) => {
+    const {active, hurt} = teamRoom(r.t);
+    const boost = hurt.length && active.length ? ` <span class="tk good">↑ with ${esc(hurt.map(h => h.name.split(" ").slice(-1)[0]).join(" & "))} out</span>` : "";
+    const who = active.map((p, j) => `<a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> <span class="muted small">${f1(p.ppg)} ppg${p.inj ? " · " + esc(p.inj) : ""}</span>${j === 0 ? boost : ""}`).join("<br>");
+    const out = hurt.map(h => `<span class="muted small">${esc(h.name)} · <b class="v-bad">${esc(h.inj)}</b></span>`).join(" · ");
+    return `<div class="pl">${rnk(i)}<span class="grow"><b>${esc(r.t)}</b> <span class="muted tiny">${rankWords(ranks.rank[r.t], ranks.n, pos, title.includes("playoff") ? "playoff schedule" : "schedule ROS")} · opponents allow ${f1(r.avg)}/g</span>
+      <div style="margin-top:4px">${who || '<span class="muted small">No regular contributor</span>'}</div>${out ? `<div style="margin-top:2px">${out}</div>` : ""}</span>${easeTag(r.avg, pos)}</div>`;
+  };
   const list = (title, ranks, n) => {
+    if (!teamLevel) {
+      const rs = ranks.rows.slice().sort((a, b) => b.avg - a.avg);
+      const best = rs.slice(0, n), worst = rs.slice(-5).reverse();
+      return `<h2>${title}</h2><div class="card list">${best.map((r, i) => teamCard(r, i, ranks, title)).join("")}</div>
+      <p class="small muted" style="margin:8px 0 2px">Toughest (watch out):</p><div class="card list">${worst.map((r, i) => teamCard(r, rs.length - 1 - i, ranks, title)).join("")}</div>`;
+    }
     const xs = playersFor(ranks), best = xs.slice(0, n), worst = xs.slice(-5).reverse();
     const row = (x, i, rk) => `<div class="pl">${rnk(i)}${x.p ? head(x.p) : ""}<span class="grow">${x.p ? `<a href="#/p/${x.p.id}"><b>${esc(x.p.name)}</b></a>` : `<b>${esc(x.label)}</b>`} <span class="muted small">${x.p ? x.p.pos + " · " + x.t + " · " + f1(x.p.ppg) + " ppg" : esc(x.sub || "")}</span><br><span class="muted tiny">${rankWords(rk, ranks.n, pos, title.includes("playoff") ? "playoff schedule" : "schedule ROS")} · opponents allow ${f1(x.avg)}/g</span></span>${easeTag(x.avg, pos)}</div>`;
     return `<h2>${title}</h2><div class="card list">${best.map((x, i) => row(x, i, ranks.rank[x.t])).join("")}</div>
