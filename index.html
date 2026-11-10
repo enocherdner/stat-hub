@@ -14,7 +14,7 @@
 <title>FF Stat Hub</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 <header class="top">
@@ -23,19 +23,20 @@
     <input id="q" type="search" placeholder="Search any player…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Search players">
     <div id="sugg" class="sugg" role="listbox" hidden></div>
   </div>
+  <a href="#/roster" class="hdr-roster" aria-label="My roster" title="My roster">👤</a>
   <select id="scoring" class="scoring" aria-label="Scoring"><option value="half">Half PPR</option><option value="ppr">PPR</option><option value="std">Standard</option></select>
 </header>
 <nav class="tabs">
   <a href="#/" data-tab="news"><span class="ic">📰</span>News</a>
-  <a href="#/rankings" data-tab="home"><span class="ic">🏆</span>Rankings</a>
+  <a href="#/rankings" data-tab="home"><span class="ic">📊</span>Rankings</a>
   <a href="#/waivers" data-tab="waivers"><span class="ic">📈</span>Waivers</a>
   <a href="#/ss" data-tab="ss"><span class="ic">✅</span>Start/Sit</a>
   <a href="#/trade" data-tab="trade"><span class="ic">🔁</span>Trade</a>
-  <a href="#/roster" data-tab="roster"><span class="ic">👤</span>My Roster</a>
+  <a href="#/records" data-tab="records"><span class="ic">🏆</span>Records</a>
 </nav>
 <main id="app"><p class="muted pad">Loading…</p></main>
 <div id="toast" class="toast" hidden></div>
-<script src="app.js?v=38"></script>
-<script src="field.js?v=38"></script>
+<script src="app.js?v=39"></script>
+<script src="field.js?v=39"></script>
 </body>
 </html>

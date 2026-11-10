@@ -636,13 +636,12 @@ const MIN_GP = 3;
 function rnk(i) { return `<span class="rk ${["gold", "silver", "bronze"][i] || ""}">${i + 1}</span>`; }
 V.home = () => {
   setTab("home");
-  const view = V.home.view || "wk";
+  const view = (V.home.view === "rw" ? "wk" : V.home.view) || "wk";
   const pos = V.home.pos || "RB";
-  const sub = `<div class="subtabs"><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Best matchups ROS</button><button class="${view === "rw" ? "on" : ""}" data-view="rw">🏆 Record watch</button></div>`;
+  const sub = `<div class="subtabs"><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Best matchups ROS</button></div>`;
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
   const mxPos = pos === "FLEX" ? "RB" : pos;
   const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
-  if (view === "rw") return `<h1>Rankings</h1>${sub}${recordWatch()}`;
   return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + tabSearch("rank", "Search this list…") + (view === "ros" ? rosList(pos) : view === "wk" ? weeklyList(pos) : ppgList(pos))}${stamp()}`;
 };
 function ppgList(pos) {
@@ -784,6 +783,7 @@ function recordWatch() {
   <h2>Milestones coming up</h2><div class="card list">${miles || '<p class="muted">Nobody close to a milestone right now.</p>'}</div>
   <p class="note">Career numbers and career highs use regular-season games since ${R.since}. Records are the official NFL single-season marks.</p>`;
 }
+V.records = () => { setTab("records"); return `<h1>Records</h1>${recordWatch()}`; };
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
 function sigWhy(r) {
@@ -1137,7 +1137,7 @@ V.news = () => {
   <p class="muted small">Updated ${ago(D.news.updated)}.</p>
   ${tabSearch("news", "Search news: player, team…")}
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
-  ${nv === "top" && (D.records?.big || []).length ? `<a class="card trophycard" href="#/rankings" data-view="rw"><b>🏆 Week ${D.records.week} big games</b><div class="small ink2" style="margin-top:4px">${D.records.big.slice(0, 4).map(b => `<b>${esc(b.name)}</b>: ${esc([...b.highs.map(h => h.replace(/ \(.*\)/, "")), ...b.feats].slice(0, 2).join(", "))}`).join(" · ")}</div><div class="tiny muted" style="margin-top:4px">See Record watch →</div></a>` : ""}
+  ${nv === "top" && (D.records?.big || []).length ? `<a class="card trophycard" href="#/records"><b>🏆 Week ${D.records.week} big games</b><div class="small ink2" style="margin-top:4px">${D.records.big.slice(0, 4).map(b => `<b>${esc(b.name)}</b>: ${esc([...b.highs.map(h => h.replace(/ \(.*\)/, "")), ...b.feats].slice(0, 2).join(", "))}`).join(" · ")}</div><div class="tiny muted" style="margin-top:4px">See Record watch →</div></a>` : ""}
   <div class="news-grid">${cards.slice(0, 300).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
 
@@ -1350,7 +1350,8 @@ function render() {
   let html;
   if (r === "p") html = V.player(a);
   else if (r === "c") html = V.compare(a, b);
-  else if (!r || r === "news") html = V.news();   // News is the landing page
+  else if (!r || r === "news") html = V.news();
+  else if (r === "records") html = V.records();   // News is the landing page
   else if (r === "waivers") html = V.waivers();
   else if (r === "ss") html = V.ss();
   else if (r === "trade") html = V.trade();
