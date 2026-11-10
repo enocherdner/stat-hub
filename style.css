@@ -317,3 +317,11 @@ table.rt tbody td:last-child{border-right:1px solid var(--line);border-radius:0 
 @media (max-width:700px){.top .search{position:static}.top #sugg{left:10px;right:10px;top:calc(100% + 4px);max-height:65vh}}
 /* header mark = the FF Stat Hub logo (same as the app icon and the Instagram picture) */
 :root[data-look="gameday"] .brand::before,.brand::before{content:"";display:inline-block;width:32px;height:32px;background:url(icons/icon-192.png?v=3) center/cover;border-radius:9px;vertical-align:-9px;margin-right:9px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.roster-cta{display:flex;align-items:center;gap:12px;margin:10px 0 12px;padding:12px 14px;border-radius:12px;border:1.5px dashed var(--accent,#3ba3ff);background:rgba(59,163,255,.12);color:var(--ink);text-decoration:none}
+.roster-cta .ic{font-size:22px}
+.roster-cta .sub{display:block;font-size:12px;color:var(--ink2);margin-top:2px}
+.roster-cta .go{flex:none;font-weight:700;color:#fff;background:var(--accent,#3ba3ff);padding:7px 12px;border-radius:9px;font-size:13px}
+.roster-cta.on{border-style:solid;background:rgba(40,200,120,.10);border-color:rgba(40,200,120,.55)}
+.roster-cta.on .go{background:transparent;color:var(--ink2);border:1px solid var(--line)}
+.hdr-roster .lbl{display:none}
+@media (min-width:700px){.hdr-roster{width:auto;padding:0 10px;display:flex;gap:6px;font-size:14px;color:var(--ink)}.hdr-roster .lbl{display:inline;font-weight:600}}

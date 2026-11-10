@@ -1285,15 +1285,24 @@ V.ss = () => {
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
       <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span><div class="tiny muted" style="margin-top:4px">${x.bye ? "" : `${f1(x.floor)}–${f1(x.ceil)}`}</div></div></div>`).join("") +
-      `</div><p class="note">${roster().length ? "Your roster is factored into the write-up (depth, byes, who else you could start). " : ""}Projection = expert consensus blended with our usage, matchup and injury numbers.</p>
+      `</div><p class="note">Projection = expert consensus blended with our usage, matchup and injury numbers.</p>
       <button class="btn ghost" data-act="ask-ss">Ask the coach on Telegram</button>`;
   }
   return `<h1>Start / Sit</h1><p class="muted small"><b>Week ${wk} start/sit</b> (games ${weekDates(wk)}). Add 3 or more players, any positions. It ranks them all like a FLEX call.</p>
+  ${rosterCTA()}
   <div class="card list">${slots.join("")}</div>
   <div class="row wrap" style="margin-top:8px"><button class="btn ghost sm" data-act="ss-add">+ Add player</button>
     ${n >= 2 ? `<span class="muted small" style="margin-left:6px">Slots to fill:</span>${Array.from({length: Math.max(1, n - 1)}, (_, i) => i + 1).map(k => `<button class="chip ${k === V.ssN ? "on" : ""}" data-ssn="${k}">${k}</button>`).join("")}` : ""}</div>
   ${out}`;
 };
+
+/* ---- roster call-to-action (Trade, Start/Sit) ---- */
+function rosterCTA() {
+  const n = roster().filter(id => BY[id]).length;
+  return n
+    ? `<a class="roster-cta on" href="#/roster"><span class="ic">👤</span><span class="grow"><b>Using your roster</b> · ${n} player${n === 1 ? "" : "s"}<span class="sub">Positional need, depth and byes are in the write-up</span></span><span class="go">Edit ›</span></a>`
+    : `<a class="roster-cta" href="#/roster"><span class="ic">👤</span><span class="grow"><b>Add your roster</b><span class="sub">The write-up then weighs your positional need, depth and byes</span></span><span class="go">Add ›</span></a>`;
+}
 
 /* ---- trade ---- */
 V.trade = () => {
@@ -1318,12 +1327,13 @@ V.trade = () => {
     out = `<div id="nums"><div class="card"><div class="verdict ${verdict[1]}">${verdict[0]}</div><div>${verdict[2]}</div>
       <div class="small muted" style="margin-top:4px">You give ${f1(tg)} · you get ${f1(tr)} projected ${SCL()} points through week ${LAST_FANTASY_WEEK}.</div></div>
       ${tbl(G, "You give")}${tbl(R, "You get")}
-      ${roster().length ? `<p class="note">Your roster is factored into the write-up (positional need, depth, byes).</p>` : `<p class="note">Add your players on the My Roster tab and the write-up will weigh positional need, depth and byes.</p>`}</div>
+</div>
       ${anaPanel("trade", [...V.give, "|", ...V.get, rosterTag()], false)}
       <p class="note">Value = expert rest-of-season ranks blended with our numbers, through week ${LAST_FANTASY_WEEK}.</p>
       <button class="btn" data-act="ask-trade">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
   }
   return `<h1>Trade analyzer</h1><p class="muted small">Rest of season: weeks ${nextWeek()}–${LAST_FANTASY_WEEK}, experts + our numbers.</p>
+  ${rosterCTA()}
   <div class="sides"><div class="card"><b>You give</b>${listPicker("give", "Add a player you give…")}</div>
   <div class="card"><b>You get</b>${listPicker("get", "Add a player you get…")}</div></div>
   ${out}`;
@@ -1336,7 +1346,7 @@ V.roster = () => {
   V.rIds = r;
   const order = {QB: 0, RB: 1, WR: 2, TE: 3};
   const sorted = r.map(id => BY[id]).sort((a, b) => (order[a.pos] - order[b.pos]) || (b.ppg - a.ppg));
-  return `<h1>My roster</h1><p class="muted small">Saved on this device only. Used for Start/Sit quick picks and the News filter.</p>
+  return `<h1>My roster</h1><p class="muted small">Saved on this device only. Used in Trade and Start/Sit write-ups (positional need, depth, byes) and the News filter.</p>
   <div class="pick" style="margin-top:10px"><input id="pk-rIds" placeholder="Add a player to my roster…" autocomplete="off"><div id="pks-rIds" class="sugg" hidden></div></div>
   <div class="card list">${sorted.length ? sorted.map(p => `<div class="pl-wrap">${plRow(p)}<button class="rm" data-rm="rIds" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join("") : '<p class="muted">No players yet. Search above or paste names below.</p>'}</div>
   <h2>Paste names</h2>
