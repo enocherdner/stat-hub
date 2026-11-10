@@ -468,6 +468,24 @@ function luckExplain(id) {
   return out.join(" ");
 }
 
+
+/* In-tab quick filter: narrows the list on screen as you type (the header search is the full player search). */
+const TQ = {};
+function tabSearch(key, ph) {
+  return `<div class="tabsearch"><input class="tabq" data-tq="${key}" type="search" placeholder="${esc(ph)}" value="${esc(TQ[key] || "")}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="${esc(ph)}"></div>`;
+}
+function applyTabQ() {
+  const inp = document.querySelector("#app .tabq"); if (!inp) return;
+  const q = norm(inp.value);
+  const items = document.querySelectorAll("#app .news-grid > *, #app .card.list > .pl, #app .card.list > a.pl, #app .rt tbody tr:not(.tot), #app .wv");
+  let shown = 0;
+  items.forEach(el => { const hit = !q || norm(el.innerText).includes(q); el.hidden = !hit; if (hit) shown++; });
+  let none = document.getElementById("tq-none");
+  if (q && !shown) { if (!none) { none = document.createElement("p"); none.id = "tq-none"; none.className = "muted"; inp.parentNode.after(none); } none.textContent = `No match for "${inp.value}" here. Try the search at the top.`; }
+  else if (none) none.remove();
+}
+document.addEventListener("input", e => { const t = e.target; if (t.classList && t.classList.contains("tabq")) { TQ[t.dataset.tq] = t.value; applyTabQ(); } });
+
 /* ---------------- usage charts (inline SVG, one series each) ---------------- */
 function spark(title, pts, fmt, max) {
   const W = 300, H = 92, padL = 30, padR = 8, padT = 10, padB = 20;
@@ -617,7 +635,7 @@ V.home = () => {
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
   const mxPos = pos === "FLEX" ? "RB" : pos;
   const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
-  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + (view === "ros" ? rosList(pos) : view === "wk" ? weeklyList(pos) : ppgList(pos))}${stamp()}`;
+  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + tabSearch("rank", "Search this list…") + (view === "ros" ? rosList(pos) : view === "wk" ? weeklyList(pos) : ppgList(pos))}${stamp()}`;
 };
 function ppgList(pos) {
   const n = LIST_LEN[pos];
@@ -960,9 +978,9 @@ V.waivers = () => {
   const wsub = `<div class="subtabs"><button class="${wv === "exp" ? "on" : ""}" data-wv="exp">Expert consensus</button><button class="${wv === "use" ? "on" : ""}" data-wv="use">Usage jumps</button></div>`;
   const filters = `<div class="seg">${["ALL","QB","RB","WR","TE"].map(x => `<button class="chip ${x === posF ? "on" : ""}" data-wpos="${x}">${x === "ALL" ? "All" : x}</button>`).join("")}<button class="chip ${hide ? "on" : ""}" data-act="whide">${hide ? "✓ " : ""}Hide my roster</button></div>
   <div class="seg"><span class="muted small" style="align-self:center">Max rostered:</span>${[30, 45, 60, 75, 100].map(x => `<button class="chip ${x === maxOwn ? "on" : ""}" data-own="${x}">${x === 100 ? "Any" : x + "%"}</button>`).join("")}</div>`;
-  if (wv === "exp") return `<h1>Waivers</h1>${wsub}${filters}${expertWaivers(posF, hide, mine, maxOwn)}`;
+  if (wv === "exp") return `<h1>Waivers</h1>${wsub}${filters}${tabSearch("waiv", "Search waivers…")}${expertWaivers(posF, hide, mine, maxOwn)}`;
   return `<h1>Waivers</h1>${wsub}<p class="muted small"><b>Week ${W.week + 1} waivers</b> (pickups for week ${W.week + 1} games, based on week ${W.week} usage): usage jumps from last week vs the 3 before (snap %, target share, carries, opportunity share), plus backups moving up behind an injured starter. Ranked by opportunities gained. Only players rostered in ${maxOwn}% of leagues or fewer (ESPN roster %); ${hidden} more are hidden as likely taken. Players who are out are left off. Updated ${ago(W.updated)}.</p>
-  ${filters}
+  ${filters}${tabSearch("waiv", "Search waivers…")}
   <div class="only-narrow">${list.slice(0, 60).map(card).join("") || '<p class="muted">Nothing flagged yet.</p>'}</div>
   <div class="only-wide card"><table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Rostered</th><th>Opps gained</th><th>Why</th><th>Adds 48h</th><th>PPG</th></tr></thead><tbody>
   ${list.slice(0, 60).map((e, i) => { const p = BY[e.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)} ${mine.has(e.id) ? '<span class="badge">mine</span>' : ""}</td><td>${p.pos}</td><td>${p.team}</td><td>${e.own == null ? "–" : e.own.toFixed(0) + "%"}</td><td><b>+${f1(e.gain)}</b></td><td class="wrapcell">${e.reasons.map(esc).join("<br>")}${e.starter?.news ? `<br><span class="muted">News: ${esc(e.starter.news.head)}</span>` : ""}</td><td>${e.trend ? e.trend.toLocaleString() : "–"}</td><td>${f1(BY[e.id] ? BY[e.id].ppg : e.ppg)}</td></tr>`; }).join("")}</tbody></table></div>`;
@@ -1077,8 +1095,9 @@ V.news = () => {
   return `<h1>News</h1>
   <div class="subtabs"><button class="${nv === "top" ? "on" : ""}" data-nv="top">Top news (${nTop})</button><button class="${nv === "all" ? "on" : ""}" data-nv="all">All news</button></div>
   <p class="muted small">Updated ${ago(D.news.updated)}.</p>
+  ${tabSearch("news", "Search news: player, team…")}
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
-  <div class="news-grid">${cards.slice(0, 120).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
+  <div class="news-grid">${cards.slice(0, 300).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
 
 /* ---- start/sit ---- */
@@ -1297,6 +1316,7 @@ function render() {
   else if (r && r.startsWith("roster")) html = V.roster();
   else html = V.home();
   $("#app").innerHTML = html;
+  setTimeout(applyTabQ, 0);
   ["give", "get", "rIds"].forEach(wirePicker);
   const sq = $("#sched-q");
   if (sq) attachSearch(sq, sq.nextElementSibling, p => { V.schedP = p.id; if (["QB","RB","WR","TE"].includes(p.pos)) V.home.pos = p.pos; render(); });
