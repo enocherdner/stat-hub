@@ -822,13 +822,24 @@ function recapView() {
   const link = (id, name) => BY[id] ? `<a href="#/p/${id}"><b>${esc(name)}</b></a>` : `<b>${esc(name)}</b>`;
   // the week's 12 best fantasy games (in the chosen scoring), with big-game / career-high tags where they apply
   const tags = Object.fromEntries((R.big || []).map(b => [b.id, b]));
-  const line = w => [w.pyd >= 200 && `${w.pyd} pass yds`, w.ptd && `${w.ptd} pass TD`, w.ryd >= 40 && `${w.ryd} rush yds`, w.recyd >= 40 && `${w.rec}-${w.recyd} receiving`, (w.rtd + w.rectd) && `${w.rtd + w.rectd} TD`].filter(Boolean);
+  // every stat, written out: passing, rushing, receiving, turnovers
+  const statLine = w => {
+    const out = [];
+    if (w.att) out.push(`${w.cmp}/${w.att}, ${w.pyd} pass yds, ${w.ptd} TD${w.int ? `, ${w.int} INT` : ""}`);
+    const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    if (w.car) out.push(`${pl(w.car, "carry", "carries")}, ${w.ryd} rush yds${w.rtd ? `, ${w.rtd} TD` : ""}`);
+    if (w.tgt || w.rec) out.push(`${pl(w.rec, "catch", "catches")} (${pl(w.tgt, "target", "targets")}), ${w.recyd} rec yds${w.rectd ? `, ${w.rectd} TD` : ""}`);
+    if (w.fl) out.push(`${w.fl} fumble${w.fl > 1 ? "s" : ""} lost`);
+    if (w.two) out.push(`${w.two} two-point conversion${w.two > 1 ? "s" : ""}`);
+    return out.join(" · ");
+  };
+  const line = w => [];
   let bigList = D.players.filter(p => ["QB", "RB", "WR", "TE"].includes(p.pos))
     .map(p => { const w = weeks(p.id).find(x => x.wk === wk); if (!w) return null; const t = tags[p.id];
-      return {id: p.id, name: p.name, pos: p.pos, team: w.team, opp: w.opp, feats: t && t.feats.length ? t.feats : line(w), highs: t ? t.highs : [], pts: w.pts}; })
+      return {id: p.id, name: p.name, pos: p.pos, team: w.team, opp: w.opp, feats: t ? t.feats : [], highs: t ? t.highs : [], stat: statLine(w), pts: w.pts}; })
     .filter(Boolean);
   const big = bigList.sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).slice(0, 12).map((b, i) => { const pts = b.pts; return `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
-    ${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
+    <span class="small ink2">${esc(b.stat || "")}</span>${b.feats.length || b.highs.length ? "<br>" : ""}${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
     <span class="r"><b>${pts == null ? "–" : f1(pts)}</b><br><span class="muted tiny">pts</span></span></div>`; }).join("");
   const inTop = new Set(bigList.slice().sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).slice(0, 12).map(b => b.id));
   const also = (R.big || []).filter(b => !inTop.has(b.id)).map(b => ({...b, pts: weekPts(b.id, wk)})).sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1));
@@ -1204,7 +1215,6 @@ V.news = () => {
   <p class="muted small">Updated ${ago(D.news.updated)}.</p>
   ${tabSearch("news", "Search news: player, team…")}
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
-  ${nv === "top" && (D.records?.big || []).length ? `<a class="card trophycard" href="#/" data-nv="recap"><b>🏆 Week ${D.records.week} big games</b><div class="small ink2" style="margin-top:4px">${D.records.big.slice(0, 4).map(b => `<b>${esc(b.name)}</b>: ${esc([...b.highs.map(h => h.replace(/ \(.*\)/, "")), ...b.feats].slice(0, 2).join(", "))}`).join(" · ")}</div><div class="tiny muted" style="margin-top:4px">See the Week ${D.records.week} recap →</div></a>` : ""}
   <div class="news-grid">${cards.slice(0, 300).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
 
