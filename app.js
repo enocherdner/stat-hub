@@ -5,7 +5,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const D = {};               // meta, players, stats, teams, news
 let BY = {};                // id -> player
 let F = {};                 // field name -> index
-const LAST_FANTASY_WEEK = 17;
+const LAST_FANTASY_WEEK = 18;   // rest of season = the whole regular season (his call 2026-11-09)
+const PLAYOFFS = [15, 17];      // fantasy playoffs
 const BOT = "https://t.me/Clutchclips_bot";
 
 async function load(name) {
@@ -573,7 +574,7 @@ function rankWords(rank, n, pos, what) {
   return rank <= n / 2 ? `${rank === 1 ? "Easiest" : ord(rank) + " easiest"} ${pos} ${what}` : `${n - rank + 1 === 1 ? "Toughest" : ord(n - rank + 1) + " toughest"} ${pos} ${what}`;
 }
 function schedView(pos) {
-  const wk = nextWeek(), PO = [15, LAST_FANTASY_WEEK];
+  const wk = nextWeek(), PO = PLAYOFFS;
   const ros = teamSchedRanks(pos, wk, LAST_FANTASY_WEEK), po = teamSchedRanks(pos, PO[0], PO[1]);
   const pick = V.schedP && BY[V.schedP] ? BY[V.schedP] : null;
   let one = "";
@@ -583,8 +584,8 @@ function schedView(pos) {
     const weeksAll = []; for (let w = wk; w <= LAST_FANTASY_WEEK; w++) weeksAll.push(w);
     one = `<div class="card"><div class="row wrap"><a href="#/p/${pick.id}"><b>${esc(pick.name)}</b></a><span class="muted small">${pick.pos} · ${pick.team}</span>
       <span class="small" style="margin-left:auto">${rankWords(ros.rank[pick.team], ros.n, pos, "schedule ROS")} · ${rankWords(po.rank[pick.team], po.n, pos, "playoff schedule")}</span></div>
-      <div class="schedrows">${weeksAll.map(w => { const g = all.find(x => x[0] === w); if (!g) return `<div class="sr ${w >= 15 ? "po" : ""}"><b>Wk ${w}</b><span class="muted">BYE</span><span></span></div>`;
-        const v = (D.teams.dvp[g[1]] || {})[pos]; return `<div class="sr ${w >= 15 ? "po" : ""}"><b>Wk ${w}</b><span>${g[2] ? "vs" : "@"} ${g[1]} <span class="muted tiny">allows ${v == null ? "?" : f1(v)} to ${pos}s</span></span>${easeTag(v, pos)}</div>`; }).join("")}</div></div>`;
+      <div class="schedrows">${weeksAll.map(w => { const g = all.find(x => x[0] === w); if (!g) return `<div class="sr ${w >= 15 && w <= 17 ? "po" : ""}"><b>Wk ${w}</b><span class="muted">BYE</span><span></span></div>`;
+        const v = (D.teams.dvp[g[1]] || {})[pos]; return `<div class="sr ${w >= 15 && w <= 17 ? "po" : ""}"><b>Wk ${w}</b><span>${g[2] ? "vs" : "@"} ${g[1]} <span class="muted tiny">allows ${v == null ? "?" : f1(v)} to ${pos}s</span></span>${easeTag(v, pos)}</div>`; }).join("")}</div></div>`;
   } else if (pick) one = `<p class="muted small">Pick the ${pick.pos} tab to see ${esc(pick.name)}'s schedule.</p>`;
   const teamLevel = pos === "K" || pos === "DEF";
   const playersFor = ranks => {
@@ -611,7 +612,7 @@ function matchupGrid(pos) {
   const rowsAll = teams.map(t => {
     const sch = D.teams.sched[t];
     const cells = wks.map(w => { const g = sch.find(x => x[0] === w); if (!g) return {bye: true}; const v = (D.teams.dvp[g[1]] || {})[pos]; return {opp: g[1], home: g[2], v}; });
-    const play = cells.filter(c => !c.bye && c.v != null), po = cells.filter((c, i) => wks[i] >= 15 && !c.bye && c.v != null);
+    const play = cells.filter(c => !c.bye && c.v != null), po = cells.filter((c, i) => wks[i] >= 15 && wks[i] <= 17 && !c.bye && c.v != null);
     const avg = a => a.length ? a.reduce((s, c) => s + c.v, 0) / a.length : 0;
     return {t, cells, ros: avg(play), po: avg(po)};
   });
@@ -619,9 +620,9 @@ function matchupGrid(pos) {
   rowsAll.sort((a, b) => b[sortBy] - a[sortBy]);
   return `<p class="muted small">Each team's remaining opponents, colored by ${SCL()} points those defenses allow to ${pos === "DEF" ? "defenses (how generous each offense is)" : pos + "s"}. Green = easy, red = tough. Weeks 15–17 (gold) are the fantasy playoffs.</p>
   <div class="seg"><span class="muted small" style="align-self:center">Sort:</span><button class="chip ${sortBy === "ros" ? "on" : ""}" data-mxs="ros">Rest of season</button><button class="chip ${sortBy === "po" ? "on" : ""}" data-mxs="po">Playoffs (15–17)</button></div>
-  <div class="scroll grid-wrap"><table class="mx"><thead><tr><th>Team</th>${wks.map(w => `<th class="${w >= 15 ? "po" : ""}">${w}</th>`).join("")}<th>ROS</th><th class="po">PO</th></tr></thead><tbody>
-  ${rowsAll.map(r => `<tr><td><b>${r.t}</b></td>${r.cells.map((c, i) => c.bye ? `<td class="bye ${wks[i] >= 15 ? "po" : ""}">BYE</td>` :
-    `<td class="${wks[i] >= 15 ? "po" : ""}" style="background:${heat(c.v, lo, hi)}" title="${c.home ? "vs" : "@"} ${c.opp}: allows ${c.v == null ? "?" : f1(c.v)}">${c.home ? "" : '<span class="at">@</span>'}${c.opp}</td>`).join("")}
+  <div class="scroll grid-wrap"><table class="mx"><thead><tr><th>Team</th>${wks.map(w => `<th class="${w >= 15 && w <= 17 ? "po" : ""}">${w}</th>`).join("")}<th>ROS</th><th class="po">PO</th></tr></thead><tbody>
+  ${rowsAll.map(r => `<tr><td><b>${r.t}</b></td>${r.cells.map((c, i) => c.bye ? `<td class="bye ${wks[i] >= 15 && wks[i] <= 17 ? "po" : ""}">BYE</td>` :
+    `<td class="${wks[i] >= 15 && wks[i] <= 17 ? "po" : ""}" style="background:${heat(c.v, lo, hi)}" title="${c.home ? "vs" : "@"} ${c.opp}: allows ${c.v == null ? "?" : f1(c.v)}">${c.home ? "" : '<span class="at">@</span>'}${c.opp}</td>`).join("")}
     <td>${f1(r.ros)}</td><td class="po">${f1(r.po)}</td></tr>`).join("")}
   </tbody></table></div>
   <div class="legend"><span>Tough</span>${["#5b1f2a", "#6b3a2a", "#3a3f55", "#2a5a3c", "#1f7a45"].map(c => `<i style="background:${c}"></i>`).join("")}<span>Easy</span></div>`;
@@ -961,7 +962,7 @@ function byeWeek(team) {
 function outlookBlock(id) {
   const R = ros(id), p = BY[id], up = nextGames(p.team, nextWeek()).slice(0, 4);
   const opp = up.map(g => { const m = matchupFactor(g[1], p.pos); return `Wk ${g[0]} ${g[2] ? "vs" : "@"} ${g[1]} (${m.f > 1.03 ? "easy" : m.f < 0.97 ? "tough" : "neutral"})`; }).join(" · ");
-  return `<h2>Outlook</h2><div class="card small ink2">Rest of season: <b style="color:var(--ink)">${f1(R.total)}</b> projected ${SCL()} pts over ${R.games - R.miss} games (${f1(R.base)}/g, schedule ${R.sos.toFixed(2)}, usage trend ×${R.usageF.toFixed(2)}${R.roomAdj !== 1 ? `, room ×${R.roomAdj.toFixed(2)}` : ""}). Bye week ${byeWeek(p.team) ?? "–"}.<br>Next: ${opp || "–"}</div>`;
+  return `<h2>Outlook</h2><div class="card small ink2">Rest of season: <b style="color:var(--ink)">${f1(R.total)}</b> projected ${SCL()} pts over ${R.games} games left${R.miss ? ` (${esc(R.p.inj)}: misses ~${R.miss})` : ""} (${f1(R.base)}/g, schedule ${R.sos.toFixed(2)}, usage trend ×${R.usageF.toFixed(2)}${R.roomAdj !== 1 ? `, room ×${R.roomAdj.toFixed(2)}` : ""}). Bye week ${byeWeek(p.team) ?? "–"}.<br>Next: ${opp || "–"}</div>`;
 }
 /* His roster, written out for the trade and start/sit write-ups (it never leaves his device otherwise). */
 function rosterContext(extraGive = [], extraGet = []) {
@@ -1211,9 +1212,9 @@ V.trade = () => {
       : ["CLOSE CALL", "v-even", `Within 8% either way (${diff >= 0 ? "+" : ""}${f1(diff)} pts). Decide on roster need.`];
     V.tradeLast = {G, R, tg, tr, verdict};
     const tcards = xs => `<div class="only-narrow">${xs.map(x => `<div class="card"><div class="row"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a><span class="muted small">${x.p.pos} · ${x.p.team}</span>${injBadge(x.p)}<b style="margin-left:auto">${f1(x.total)}</b><span class="muted tiny">ROS</span></div>${x.expertRank ? `<div class="small ink2">Experts ${esc(x.expertRank)} ROS (≈${f1(x.expertVal)} pts) · our numbers ${f1(x.ours)} → blended ${f1(x.total)}</div>` : ""}
-      <div class="small ink2">${f1(x.base)}/g · L4 ${f1(x.S.l4.ppg)} · season ${f1(x.S.s.ppg)} · ${x.games - x.miss} games left${x.miss ? ` (−${x.miss})` : ""} · sched ${x.sos.toFixed(2)} · share ${pct(share(x.p.pos, x.S.l4))} · room ×${x.roomAdj.toFixed(2)}</div></div>`).join("")}</div>`;
+      <div class="small ink2">${f1(x.base)}/g · L4 ${f1(x.S.l4.ppg)} · season ${f1(x.S.s.ppg)} · ${x.games} games left${x.miss ? ` (${esc(x.p.inj)}: misses ~${x.miss})` : ""} · sched ${x.sos.toFixed(2)} · share ${pct(share(x.p.pos, x.S.l4))} · room ×${x.roomAdj.toFixed(2)}</div></div>`).join("")}</div>`;
     const tbl = (xs, t) => `<h2>${t}</h2>${tcards(xs)}<div class="scroll only-wide"><table><thead><tr><th>Player</th><th>ROS pts</th><th>Experts</th><th>Ours</th><th>Per game</th><th>L4 ppg</th><th>Season ppg</th><th>Games left</th><th>Sched</th><th>Share L4</th><th>Room</th><th>Status</th></tr></thead><tbody>
-      ${xs.map(x => `<tr><td><a href="#/p/${x.id}">${esc(x.p.name)}</a> <span class="muted">${x.p.pos}</span></td><td><b>${f1(x.total)}</b></td><td>${x.expertRank ? `${esc(x.expertRank)} (${f1(x.expertVal)})` : "–"}</td><td>${f1(x.ours ?? x.total)}</td><td>${f1(x.base)}</td><td>${f1(x.S.l4.ppg)}</td><td>${f1(x.S.s.ppg)}</td><td>${x.games - x.miss}${x.miss ? ` <span class="muted">(-${x.miss})</span>` : ""}</td><td>${x.sos.toFixed(2)}</td><td>${pct(share(x.p.pos, x.S.l4))}</td><td>×${x.roomAdj.toFixed(2)}</td><td>${x.p.inj || "–"}</td></tr>`).join("")}
+      ${xs.map(x => `<tr><td><a href="#/p/${x.id}">${esc(x.p.name)}</a> <span class="muted">${x.p.pos}</span></td><td><b>${f1(x.total)}</b></td><td>${x.expertRank ? `${esc(x.expertRank)} (${f1(x.expertVal)})` : "–"}</td><td>${f1(x.ours ?? x.total)}</td><td>${f1(x.base)}</td><td>${f1(x.S.l4.ppg)}</td><td>${f1(x.S.s.ppg)}</td><td>${x.games}${x.miss ? ` <span class="muted">(${esc(x.p.inj)}, ~${x.miss} out)</span>` : ""}</td><td>${x.sos.toFixed(2)}</td><td>${pct(share(x.p.pos, x.S.l4))}</td><td>×${x.roomAdj.toFixed(2)}</td><td>${x.p.inj || "–"}</td></tr>`).join("")}
       <tr class="tot"><td>Total</td><td>${f1(xs.reduce((a, x) => a + x.total, 0))}</td><td colspan="10"></td></tr></tbody></table></div>
       ${xs.flatMap(x => x.roomNotes.map(n => `<p class="small ink2">• ${esc(n.t)}</p>`)).join("")}
       ${xs.map(x => newsLine(x.id)).filter(Boolean).map(t => `<p class="small ink2">• ${esc(t)}</p>`).join("")}`;
@@ -1261,7 +1262,7 @@ function askSS() {
 }
 function askTrade() {
   const {G, R, tg, tr, verdict} = V.tradeLast;
-  const l = x => `${x.p.name} (${x.p.pos} ${x.p.team}): ROS ${f1(x.total)}, ${f1(x.base)}/g, L4 ${f1(x.S.l4.ppg)}, season ${f1(x.S.s.ppg)}, ${x.games - x.miss} games left, sched ${x.sos.toFixed(2)}, ${x.p.inj || "healthy"}`;
+  const l = x => `${x.p.name} (${x.p.pos} ${x.p.team}): ROS ${f1(x.total)}, ${f1(x.base)}/g, L4 ${f1(x.S.l4.ppg)}, season ${f1(x.S.s.ppg)}, ${x.games} games left${x.miss ? ` (${x.p.inj}, misses ~${x.miss})` : ""}, sched ${x.sos.toFixed(2)}, ${x.p.inj || "healthy"}`;
   return `Trade check, ${SCL()}. FF Stat Hub says ${verdict[0]} (give ${f1(tg)} vs get ${f1(tr)} ROS pts).\nI give: ${G.map(l).join(" | ")}\nI get: ${R.map(l).join(" | ")}\nYour take in a few lines?`;
 }
 
