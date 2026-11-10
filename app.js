@@ -833,10 +833,23 @@ function recapView() {
     if (w.two) out.push(`${w.two} two-point conversion${w.two > 1 ? "s" : ""}`);
     return out.join(" · ");
   };
+  // 1–2 green highlight pills for every player: his standout numbers this week
+  const pills = w => {
+    const c = [];
+    const td = (w.rtd || 0) + (w.rectd || 0);
+    if (w.ptd >= 2) c.push([w.ptd * 10, `${w.ptd} pass TD`]);
+    if (w.pyd >= 250) c.push([w.pyd / 10, `${w.pyd} pass yds`]);
+    if (td >= 1) c.push([td * 12, `${td} TD${td > 1 ? "s" : ""}`]);
+    if (w.ryd >= 50) c.push([w.ryd / 5, `${w.ryd} rush yds`]);
+    if (w.recyd >= 50) c.push([w.recyd / 5, `${w.recyd} rec yds`]);
+    if (w.rec >= 7) c.push([w.rec * 2, `${w.rec} catches`]);
+    if (w.ryd + w.recyd >= 150 && w.ryd >= 30 && w.recyd >= 30) c.push([(w.ryd + w.recyd) / 4, `${w.ryd + w.recyd} scrimmage yds`]);
+    return c.sort((a, b) => b[0] - a[0]).slice(0, 2).map(x => x[1]);
+  };
   const line = w => [];
   let bigList = D.players.filter(p => ["QB", "RB", "WR", "TE"].includes(p.pos))
     .map(p => { const w = weeks(p.id).find(x => x.wk === wk); if (!w) return null; const t = tags[p.id];
-      return {id: p.id, name: p.name, pos: p.pos, team: w.team, opp: w.opp, feats: t ? t.feats : [], highs: t ? t.highs : [], stat: statLine(w), pts: w.pts}; })
+      return {id: p.id, name: p.name, pos: p.pos, team: w.team, opp: w.opp, feats: pills(w), highs: t ? t.highs : [], stat: statLine(w), pts: w.pts}; })
     .filter(Boolean);
   const big = bigList.sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).slice(0, 12).map((b, i) => { const pts = b.pts; return `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
     <span class="small ink2">${esc(b.stat || "")}</span>${b.feats.length || b.highs.length ? "<br>" : ""}${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
@@ -852,7 +865,7 @@ function recapView() {
   const top = ["QB", "RB", "WR", "TE"].map(pos => {
     const xs = D.players.filter(p => p.pos === pos).map(p => ({p, pts: weekPts(p.id, wk)})).filter(x => x.pts != null).sort((a, b) => b.pts - a.pts).slice(0, 5);
     return `<div class="col"><h2>Top ${pos}s</h2><div class="card list">${xs.map((x, i) => { const w = weeks(x.p.id).find(z => z.wk === wk);
-      return `<a class="pl" href="#/p/${x.p.id}">${rnk(i)}${head(x.p)}<span class="grow"><b>${esc(x.p.name)}</b> ${recBadge(x.p.id)}<br><span class="muted small">${x.p.team} ${w ? "vs " + w.opp : ""}</span></span><span class="r"><b>${f1(x.pts)}</b><br><span class="muted tiny">pts</span></span></a>`; }).join("")}</div></div>`;
+      return `<a class="pl" href="#/p/${x.p.id}">${rnk(i)}${head(x.p)}<span class="grow"><b>${esc(x.p.name)}</b> ${recBadge(x.p.id)}<br><span class="muted small">${x.p.team} ${w ? "vs " + w.opp : ""}</span>${w ? `<br><span class="small ink2">${esc(statLine(w))}</span>` : ""}</span><span class="r"><b>${f1(x.pts)}</b><br><span class="muted tiny">pts</span></span></a>`; }).join("")}</div></div>`;
   }).join("");
   return `<p class="small"><b>Week ${wk} recap</b> <span class="muted">· ${SCU()} points</span></p>
   <h2>Top 12 games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
