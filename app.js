@@ -830,6 +830,14 @@ function recapView() {
   const big = bigList.sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).slice(0, 12).map((b, i) => { const pts = b.pts; return `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
     ${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
     <span class="r"><b>${pts == null ? "–" : f1(pts)}</b><br><span class="muted tiny">pts</span></span></div>`; }).join("");
+  const inTop = new Set(bigList.slice().sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).slice(0, 12).map(b => b.id));
+  const also = (R.big || []).filter(b => !inTop.has(b.id)).map(b => ({...b, pts: weekPts(b.id, wk)})).sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1));
+  const alsoHtml = also.map(b => `<div class="pl"><span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
+    ${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
+    <span class="r"><b>${b.pts == null ? "–" : f1(b.pts)}</b><br><span class="muted tiny">pts</span></span></div>`).join("");
+  const kd = (pos, rows) => `<div class="col"><h2>Top ${pos === "K" ? "kickers" : "defenses"}</h2><div class="card list">${rows.map((x, i) => `<div class="pl">${rnk(i)}<span class="grow"><b>${esc(x.label)}</b><br><span class="muted small">vs ${esc(x.opp)}${x.sub ? " · " + esc(x.sub) : ""}</span></span><span class="r"><b>${f1(x.pts)}</b><br><span class="muted tiny">pts</span></span></div>`).join("") || '<p class="muted">No data.</p>'}</div></div>`;
+  const kRows = (D.kdef.K || []).map(k => { const w = (k.weeks || []).find(x => x[0] === wk); return w ? {label: `${k.name} (${k.team})`, opp: w[1], pts: w[2]} : null; }).filter(Boolean).sort((a, b) => b.pts - a.pts).slice(0, 5);
+  const dRows = (D.kdef.DEF || []).map(d => { const w = (d.weeks || []).find(x => x[0] === wk); return w ? {label: `${d.team} D/ST`, opp: w[1], pts: w[2], sub: w[3] != null ? `allowed ${w[3]}` : ""} : null; }).filter(Boolean).sort((a, b) => b.pts - a.pts).slice(0, 5);
   const top = ["QB", "RB", "WR", "TE"].map(pos => {
     const xs = D.players.filter(p => p.pos === pos).map(p => ({p, pts: weekPts(p.id, wk)})).filter(x => x.pts != null).sort((a, b) => b.pts - a.pts).slice(0, 5);
     return `<div class="col"><h2>Top ${pos}s</h2><div class="card list">${xs.map((x, i) => { const w = weeks(x.p.id).find(z => z.wk === wk);
@@ -837,7 +845,8 @@ function recapView() {
   }).join("");
   return `<p class="small"><b>Week ${wk} recap</b> <span class="muted">· ${SCU()} points</span></p>
   <h2>Top 12 games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
-  <div class="cols">${top}</div>`;
+  ${alsoHtml ? `<h2>Also big games</h2><div class="card list">${alsoHtml}</div>` : ""}
+  <div class="cols">${top}${kd("K", kRows)}${kd("DEF", dRows)}</div>`;
 }
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
