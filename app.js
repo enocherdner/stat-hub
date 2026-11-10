@@ -327,10 +327,9 @@ function projectX(id, wk) {
   x.ours = ours; x.expert = e.proj; x.proj = blend;
   x.floor = ours > 0 ? x.floor * k : blend * 0.75; x.ceil = ours > 0 ? x.ceil * k : blend * 1.25;
   const pos = x.p.pos;
-  const srcs = [e.ffbr && `Footballers ${pos}${e.ffbr}`, e.fp && `FantasyPros ${pos}${e.fp}`, e.rw && `RotoWire ${pos}${e.rw}`, e.es && `ESPN ${pos}${e.es}`].filter(Boolean).join(", ");
-  const add = [{t: `Expert consensus: ${pos}${e.crank} this week (${srcs}), ${f1(e.proj)} pts. Our numbers: ${f1(ours)}. Blended 60/40 = ${f1(blend)}`, pos: e.proj > ours * 1.1, neg: e.proj < ours * 0.9}];
-  for (const t of e.ffb || []) add.push({t: `Fantasy Footballers: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
-  for (const t of (e.other || []).slice(0, 2)) add.push({t: `${t.src}: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`});
+  const add = [{t: `FF Stat Hub consensus: ${pos}${e.crank} this week, ${f1(e.proj)} pts. Our numbers: ${f1(ours)}. Blended 60/40 = ${f1(blend)}`, pos: e.proj > ours * 1.1, neg: e.proj < ours * 0.9}];
+  for (const t of e.ffb || []) add.push({t: `Expert take: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
+  for (const t of (e.other || []).slice(0, 2)) add.push({t: `Expert take: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`});
   x.why.unshift(...add);
   return x;
 }
@@ -723,8 +722,8 @@ function fpWeeklyList(pos, W0) {
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.pos === "DEF" ? r.name.replace(/ D\/?ST$/i, "") + " D/ST" : r.name)}</b>`;
     const ez = r.oppid ? easeTag((D.teams.dvp[r.oppid] || {})[mpos], mpos) : "";
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
-    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
-      <span class="muted small">${r.pos} · ${r.team} ${esc(r.opp)} · experts ${esc(r.prank || lbl + (i + 1))} (range ${r.min}–${r.max})${ours != null ? ` · ours ${f1(ours)}` : ""}${actTxt}</span></span>
+    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${ez}<br>
+      <span class="muted small">${r.pos} · ${r.team} ${esc(r.opp)} · consensus ${esc(r.prank || lbl + (i + 1))} (range ${r.min}–${r.max})${ours != null ? ` · ours ${f1(ours)}` : ""}${actTxt}</span></span>
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj * scF(r.id))}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const banner = done === all.length
@@ -732,7 +731,7 @@ function fpWeeklyList(pos, W0) {
     : done ? `<p class="muted small">${done} of ${all.length} have played; those rows show what they scored.</p>` : "";
   return `<p class="small"><b>Week ${wk} rankings</b> <span class="muted">· games ${weekDates(wk)} ·</span> <b>Expert consensus</b></p>
   ${banner}<div class="card list">${rows}</div>
-  <p class="note">Sources: FantasyPros. Big number = projected ${SCL()} points. "Ours" = our own projection. Grade = FantasyPros start/sit grade.</p>`;
+  <p class="note">FF Stat Hub Consensus: built from public expert rankings plus our own model. Big number = projected ${SCL()} points. "Ours" = our model's projection.</p>`;
 }
 
 /* This week = expert consensus: FantasyPros (2x) + RotoWire + ESPN projections, nudged by what the Fantasy
@@ -748,14 +747,14 @@ function lockCard(title, sub) { return `<div class="card" style="text-align:cent
 const TAKE_TXT = {start: "START", sit: "SIT", like: "LIKE", fade: "FADE", add: "ADD", stash: "STASH", drop: "DROP"};
 function takeChip(t, ffb) {
   const good = ["start", "like", "add", "stash"].includes(t.take);
-  return `<span class="tk ${good ? "good" : "bad"}${ffb ? " ffb" : ""}">${ffb ? "Fantasy Footballers" : esc(t.src)}: ${TAKE_TXT[t.take] || esc(t.take)}</span>`;
+  return `<span class="tk ${good ? "good" : "bad"}${ffb ? " ffb" : ""}">Expert: ${TAKE_TXT[t.take] || esc(t.take)}</span>`;
 }
 function weeklyList(pos) {
   const C = D.consensus || {}, T = C.week, rel = C.release ? new Date(C.release) : null;
   if (rel && Date.now() < rel) {
     const P = Number((D.weeklyPrev || {}).week) === T - 1 ? D.weeklyPrev : Number((D.weekly || {}).week) === T - 1 ? D.weekly : null;
     const recap = P ? `<h2>Week ${T - 1} recap: expert projections vs what they scored</h2>` + fpWeeklyList(pos, P) : "";
-    return lockCard(`Week ${T} rankings drop ${CT_FMT(rel)} CT`, `Sources: Fantasy Footballers, FantasyPros, RotoWire, ESPN.`) + recap;
+    return lockCard(`Week ${T} rankings drop ${CT_FMT(rel)} CT`, `FF Stat Hub Consensus: built from public expert rankings plus our own model.`) + recap;
   }
   const rows = (C.pos || {})[pos];
   if (!rows || !rows.length) return fpWeeklyList(pos);
@@ -768,18 +767,17 @@ function weeklyList(pos) {
     const w = weeks(p.id).find(x => x.wk === T);
     const act = w ? w.pts : null;
     const ez = oppid ? easeTag((D.teams.dvp[oppid] || {})[ppos], ppos) : "";
-    const srcs = [r.ffbr && `Fantasy Footballers ${ppos}${r.ffbr}`, r.fp && `FantasyPros ${ppos}${r.fp}`, r.rw && `RotoWire ${ppos}${r.rw}`, r.es && `ESPN ${ppos}${r.es}`].filter(Boolean).join(" · ");
     const ffb = (r.ffb || []).slice(0, 1).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, true)} <span class="ink2">${esc(t.note)}</span></div>`).join("");
     const oth = (r.other || []).slice(0, 2).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, false)} <span class="muted">${esc(t.note)}</span></div>`).join("");
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
-    return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${recBadge(p.id)} ${injBadge(p)} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
-      <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")} · ${srcs}${actTxt}${p.gp ? ` · season ${f1(sum(weeks(p.id), "pts"))} pts` : ""}</span>${ffb}${oth}</span>
+    return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${recBadge(p.id)} ${injBadge(p)} ${ez}<br>
+      <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")}${actTxt}${p.gp ? ` · season ${f1(sum(weeks(p.id), "pts"))} pts` : ""}</span>${ffb}${oth}</span>
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj * scF(r.id))}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const ffbN = (C.ffb || []).length;
   return `<p class="small"><b>Week ${T} rankings</b> <span class="muted">· games ${weekDates(T)} ·</span> <b>Expert consensus</b></p>
   <div class="card list">${body}</div>
-  <p class="note">Sources: ${esc([...(ffbN ? ["Fantasy Footballers"] : []), ...(C.sources || [])].join(", "))}. Proj pts = the sources' average. Updated ${ago(C.updated)}.</p>`;
+  <p class="note">FF Stat Hub Consensus: built from public expert rankings plus our own model. Proj pts = consensus projection. Updated ${ago(C.updated)}.</p>`;
 }
 
 /* ---------------- record watch: chasing history, this week's big games, milestones (no Claude) ---------------- */
@@ -913,11 +911,11 @@ function rosList(pos) {
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`;
     const sig = r.sig ? tipTag(`sig ${r.sig === "BUY" ? "buy" : "sell"}`, r.sig, `Experts rank him ${lbl}${r.ecrRank}; our numbers rank him ${lbl}${r.ourRank}. ${r.sig === "BUY" ? "Our numbers like him more than the experts do, so he may be undervalued: a good time to trade for him." : "Our numbers like him less than the experts do, so he may be overvalued: a good time to trade him away."}${r.det ? " Why: " + sigWhy(r) + "." : ""}`) : "";
     const why = r.sig && r.det ? sigWhy(r) : "";
-    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${sig}<br><span class="muted small">${r.pos} · ${r.team}${r.bye ? " · bye " + r.bye : ""} · experts ${lbl}${r.ecrRank} (overall ${r.ecr}, range ${r.min}–${r.max})${r.ourRank ? ` · ours ${lbl}${r.ourRank}` : ""}</span>${why ? `<br><span class="tiny ${r.sig === "BUY" ? "v-good" : "v-bad"}">${esc(why)}</span>` : ""}</span>
+    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${sig}<br><span class="muted small">${r.pos} · ${r.team}${r.bye ? " · bye " + r.bye : ""} · consensus ${lbl}${r.ecrRank} (overall ${r.ecr}, range ${r.min}–${r.max})${r.ourRank ? ` · ours ${lbl}${r.ourRank}` : ""}</span>${why ? `<br><span class="tiny ${r.sig === "BUY" ? "v-good" : "v-bad"}">${esc(why)}</span>` : ""}</span>
       <span class="r"><b>${r.ours == null ? "–" : f1(r.ours)}</b><br><span class="muted tiny">our ROS pts</span></span></div>`;
   }).join("");
   const buys = rows.filter(r => r.sig === "BUY").length, sells = rows.filter(r => r.sig === "SELL").length;
-  return `<p class="muted small">Ordered by our ROS points; expert rank (FantasyPros) under each name.
+  return `<p class="muted small">Ordered by our ROS points; FF Stat Hub consensus rank under each name.
  ${buys} buys · ${sells} sells (tap ⓘ on a tag for why).</p>
   <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
 }
@@ -1119,7 +1117,7 @@ V.waivers = () => {
 /* Expert waiver consensus: who the free expert articles say to add, Footballers (article + podcast) counted double. */
 function expertWaivers(posF, hide, mine, maxOwn) {
   const X = D.wcons || {players: []}, rel = X.release ? new Date(X.release) : null;
-  if (rel && Date.now() < rel) return lockCard(`Week ${X.week} waivers (expert consensus) open ${CT_FMT(rel)} CT`, "Right after Monday night. Sources: Fantasy Footballers, FantasyPros, RotoBaller, Sleeper.");
+  if (rel && Date.now() < rel) return lockCard(`Week ${X.week} waivers (expert consensus) open ${CT_FMT(rel)} CT`, "Right after Monday night.");
   let list = X.players || [];
   const hidden = list.filter(e => e.own != null && e.own > maxOwn).length;
   list = list.filter(e => e.own == null || e.own <= maxOwn);
@@ -1130,16 +1128,14 @@ function expertWaivers(posF, hide, mine, maxOwn) {
   const body = list.slice(0, 40).map((e, i) => {
     const p = e.id ? BY[e.id] : null;
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(p.name)}</b></a>` : `<b>${esc(e.name)}</b>`;
-    const chips = Object.keys(e.srcs).sort((a, b) => (b === "Fantasy Footballers") - (a === "Fantasy Footballers")).map(s => `<span class="tk good${s === "Fantasy Footballers" ? " ffb" : ""}">${esc(s)}</span>`).join(" ");
-    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="${n.src === "Fantasy Footballers" ? "v-good" : "muted"}">${esc(n.src)}:</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("");
+    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="muted">Expert:</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("");
     const n = Object.keys(e.srcs).length;
-    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} <span class="muted small">${esc(e.pos || "")} · ${esc(e.team || "")}</span> ${ownBadge(e.own)} ${p ? injBadge(p) : ""} ${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}<div style="margin-top:4px">${chips}</div>${notes}</span>
-      <span class="r"><b>${n}</b><br><span class="muted tiny">source${n === 1 ? "" : "s"}</span></span></div>`;
+    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} <span class="muted small">${esc(e.pos || "")} · ${esc(e.team || "")}</span> ${ownBadge(e.own)} ${p ? injBadge(p) : ""} ${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}${notes}</span>
+      <span class="r"><b>${n}</b><br><span class="muted tiny">expert${n === 1 ? "" : "s"}</span></span></div>`;
   }).join("");
   return `<p class="small"><b>Week ${X.week} waivers</b> <span class="muted">· pickups for games ${weekDates(X.week)} ·</span> <b>Expert consensus</b></p>
-  ${!ffbIn && ["Mon", "Tue"].includes(nowCT) ? `<div class="card small">Fantasy Footballers' picks aren't in yet (usually Tuesday around noon CT). They get added automatically.</div>` : ""}
   <div class="card list">${body || '<p class="muted">No expert waiver articles for this week yet.</p>'}</div>
-  <p class="note">Sources: ${esc((X.sources || []).join(", ") || "none posted yet")}. Showing players rostered in ${maxOwn}% of ESPN leagues or fewer${hidden ? ` (${hidden} hidden as likely taken)` : ""}. Updated ${ago(X.updated)}.</p>`;
+  <p class="note">FF Stat Hub Consensus: built from public expert rankings plus our own model. Showing players rostered in ${maxOwn}% of ESPN leagues or fewer${hidden ? ` (${hidden} hidden as likely taken)` : ""}. Updated ${ago(X.updated)}.</p>`;
 }
 
 /* ---- compare ---- */
@@ -1359,7 +1355,7 @@ async function ask(text) {
 }
 function askSS() {
   const {wk, res} = V.ssLast;
-  return `Start/sit, week ${wk}, ${SCL()}, starting ${V.ssLast.start}. My FF Stat Hub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
+  return `Start/sit, week ${wk}, ${SCL()}, starting ${V.ssLast.start}. My FF Stat Hub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, with the expert take if there is one.`;
 }
 function askTrade() {
   const {G, R, tg, tr, verdict} = V.tradeLast;
