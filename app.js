@@ -820,7 +820,14 @@ function recapView() {
   const R = D.records || {}, wk = R.week;
   if (!wk) return `<p class="muted">No recap yet.</p>`;
   const link = (id, name) => BY[id] ? `<a href="#/p/${id}"><b>${esc(name)}</b></a>` : `<b>${esc(name)}</b>`;
-  const big = (R.big || []).map(b => ({...b, pts: weekPts(b.id, wk)})).sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).map((b, i) => { const pts = b.pts; return `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
+  // the week's 12 best fantasy games (in the chosen scoring), with big-game / career-high tags where they apply
+  const tags = Object.fromEntries((R.big || []).map(b => [b.id, b]));
+  const line = w => [w.pyd >= 200 && `${w.pyd} pass yds`, w.ptd && `${w.ptd} pass TD`, w.ryd >= 40 && `${w.ryd} rush yds`, w.recyd >= 40 && `${w.rec}-${w.recyd} receiving`, (w.rtd + w.rectd) && `${w.rtd + w.rectd} TD`].filter(Boolean);
+  let bigList = D.players.filter(p => ["QB", "RB", "WR", "TE"].includes(p.pos))
+    .map(p => { const w = weeks(p.id).find(x => x.wk === wk); if (!w) return null; const t = tags[p.id];
+      return {id: p.id, name: p.name, pos: p.pos, team: w.team, opp: w.opp, feats: t && t.feats.length ? t.feats : line(w), highs: t ? t.highs : [], pts: w.pts}; })
+    .filter(Boolean);
+  const big = bigList.sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).slice(0, 12).map((b, i) => { const pts = b.pts; return `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
     ${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
     <span class="r"><b>${pts == null ? "–" : f1(pts)}</b><br><span class="muted tiny">pts</span></span></div>`; }).join("");
   const top = ["QB", "RB", "WR", "TE"].map(pos => {
@@ -829,7 +836,7 @@ function recapView() {
       return `<a class="pl" href="#/p/${x.p.id}">${rnk(i)}${head(x.p)}<span class="grow"><b>${esc(x.p.name)}</b> ${recBadge(x.p.id)}<br><span class="muted small">${x.p.team} ${w ? "vs " + w.opp : ""}</span></span><span class="r"><b>${f1(x.pts)}</b><br><span class="muted tiny">pts</span></span></a>`; }).join("")}</div></div>`;
   }).join("");
   return `<p class="small"><b>Week ${wk} recap</b> <span class="muted">· ${SCU()} points</span></p>
-  <h2>Big games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
+  <h2>Top 12 games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
   <div class="cols">${top}</div>`;
 }
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
