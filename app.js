@@ -1,4 +1,4 @@
-/* Stat Hub — plain JS, no build step. Data comes from data/*.json written by ~/.atlas/bin/stathub. */
+/* FFStatHub — plain JS, no build step. Data comes from data/*.json written by ~/.atlas/bin/stathub. */
 "use strict";
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -516,18 +516,18 @@ function ppgList(pos) {
   }
   const note = pos === "K" ? "Kickers: FG 0–39 = 3, 40–49 = 4, 50+ = 5, PAT = 1."
     : pos === "DEF" ? "Defenses: sack 1, INT / fumble rec / safety / block 2, TD 6, plus points-allowed tiers (0 = 10 … 35+ = −4)." : "";
-  return `<p class="muted small">Half-PPR points per game · top ${n} · at least ${MIN_GP} games played.</p>
+  return `<p class="muted small">Half-PPR points per game (and ${D.meta.season} season total) · top ${n} · at least ${MIN_GP} games played.</p>
   <div class="card list">${list || '<p class="muted">No data yet.</p>'}</div>${note ? `<p class="note">${note}</p>` : ""}`;
 }
 function ppgTable(ps) {
-  return `<table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>GP</th><th>PPG</th><th>Snap%</th><th>Car/g</th><th>Tgt/g</th><th>Share</th><th>RZ/g</th><th>TD</th><th>xTD</th><th>Flag</th></tr></thead><tbody>
-  ${ps.map((p, i) => { const S = summary(p.id), a = S.s, L = (D.luck.players || {})[p.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)}</td><td>${p.pos}</td><td>${p.team}</td><td>${p.gp}</td><td><b>${f1(p.ppg)}</b></td><td>${pct(a.snp)}</td><td>${f1(a.car / a.g)}</td><td>${f1(a.tgt / a.g)}</td><td>${p.pos === "QB" ? "–" : pct(share(p.pos, a))}</td><td>${f1(a.rz / a.g)}</td><td>${a.rtd + a.rectd + (p.pos === "QB" ? a.ptd : 0)}</td><td>${L ? L[0].toFixed(1) : "–"}</td><td>${luckTag(p.id)}</td></tr>`; }).join("")}</tbody></table>`;
+  return `<table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>GP</th><th>Total</th><th>PPG</th><th>Snap%</th><th>Car/g</th><th>Tgt/g</th><th>Share</th><th>RZ/g</th><th>TD</th><th>xTD</th><th>Flag</th></tr></thead><tbody>
+  ${ps.map((p, i) => { const S = summary(p.id), a = S.s, L = (D.luck.players || {})[p.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)}</td><td>${p.pos}</td><td>${p.team}</td><td>${p.gp}</td><td>${f1(sum(weeks(p.id), "pts"))}</td><td><b>${f1(p.ppg)}</b></td><td>${pct(a.snp)}</td><td>${f1(a.car / a.g)}</td><td>${f1(a.tgt / a.g)}</td><td>${p.pos === "QB" ? "–" : pct(share(p.pos, a))}</td><td>${f1(a.rz / a.g)}</td><td>${a.rtd + a.rectd + (p.pos === "QB" ? a.ptd : 0)}</td><td>${L ? L[0].toFixed(1) : "–"}</td><td>${luckTag(p.id)}</td></tr>`; }).join("")}</tbody></table>`;
 }
 function kRow(k, i) {
-  return `<div class="pl">${rnk(i)}${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · ${k.gp} gp · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+  return `<div class="pl">${rnk(i)}${head(k)}<span class="grow"><b>${esc(k.name)}</b><br><span class="muted small">K · ${k.team} · ${k.gp} gp · <b class="ink2">${f1(k.ppg * k.gp)}</b> total pts · FG ${k.fgm}/${k.fga} · 50+: ${k.fg50} · PAT ${k.pat}${k.patm ? "/" + (k.pat + k.patm) : ""}</span></span><span class="r"><b>${f1(k.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
 }
 function defRow(d, i) {
-  return `<div class="pl">${rnk(i)}<span class="grow"><b>${esc(d.team)} D/ST</b><br><span class="muted small">${d.gp} gp · ${d.sack} sacks · ${d.int} INT · ${d.fr} FR · ${d.td} TD · allows ${f1(d.papg)}/g</span></span><span class="r"><b>${f1(d.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+  return `<div class="pl">${rnk(i)}<span class="grow"><b>${esc(d.team)} D/ST</b><br><span class="muted small">${d.gp} gp · <b class="ink2">${f1(d.ppg * d.gp)}</b> total pts · ${d.sack} sacks · ${d.int} INT · ${d.fr} FR · ${d.td} TD · allows ${f1(d.papg)}/g</span></span><span class="r"><b>${f1(d.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
 }
 /* This week: FantasyPros weekly expert consensus + their projection, next to our own projection and the
    matchup. Once a game is played, the row shows what he actually scored, so you can see who the experts missed. */
@@ -602,7 +602,7 @@ function weeklyList(pos) {
     const oth = (r.other || []).slice(0, 2).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, false)} <span class="muted">${esc(t.note)}</span></div>`).join("");
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
     return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${injBadge(p)} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
-      <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")} · ${srcs}${actTxt}</span>${ffb}${oth}</span>
+      <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")} · ${srcs}${actTxt}${p.gp ? ` · season ${f1(sum(weeks(p.id), "pts"))} pts` : ""}</span>${ffb}${oth}</span>
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj)}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const ffbN = (C.ffb || []).length;
@@ -658,7 +658,7 @@ function rosList(pos) {
   <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
 }
 function plRow(p, i) {
-  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)} ${typeof i === "number" ? luckTag(p.id) : ""}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
+  return `<a class="pl" href="#/p/${p.id}">${typeof i === "number" ? rnk(i) : ""}${head(p)}<span class="grow"><b>${esc(p.name)}</b> ${injBadge(p)} ${typeof i === "number" ? luckTag(p.id) : ""}<br><span class="muted small">${p.pos} · ${p.team}${p.gp ? ` · ${p.gp} gp` : ""}${typeof i === "number" && p.gp ? ` · <b class="ink2">${f1(sum(weeks(p.id), "pts"))}</b> total pts` : ""}</span></span><span class="r"><b>${p.gp ? f1(p.ppg) : "–"}</b><br><span class="muted tiny">ppg</span></span></a>`;
 }
 
 function statTiles(p, a, n) {
@@ -1067,12 +1067,12 @@ async function ask(text) {
 }
 function askSS() {
   const {wk, res} = V.ssLast;
-  return `Start/sit, week ${wk}, half PPR, starting ${V.ssLast.start}. My Stat Hub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
+  return `Start/sit, week ${wk}, half PPR, starting ${V.ssLast.start}. My FFStatHub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
 }
 function askTrade() {
   const {G, R, tg, tr, verdict} = V.tradeLast;
   const l = x => `${x.p.name} (${x.p.pos} ${x.p.team}): ROS ${f1(x.total)}, ${f1(x.base)}/g, L4 ${f1(x.S.l4.ppg)}, season ${f1(x.S.s.ppg)}, ${x.games - x.miss} games left, sched ${x.sos.toFixed(2)}, ${x.p.inj || "healthy"}`;
-  return `Trade check, half PPR. Stat Hub says ${verdict[0]} (give ${f1(tg)} vs get ${f1(tr)} ROS pts).\nI give: ${G.map(l).join(" | ")}\nI get: ${R.map(l).join(" | ")}\nYour take in a few lines?`;
+  return `Trade check, half PPR. FFStatHub says ${verdict[0]} (give ${f1(tg)} vs get ${f1(tr)} ROS pts).\nI give: ${G.map(l).join(" | ")}\nI get: ${R.map(l).join(" | ")}\nYour take in a few lines?`;
 }
 
 /* ---------------- written analysis (Claude, only when he asks; cached per player set per day) ---------------- */

@@ -63,15 +63,15 @@
         g.fillText(label, 0, 0); g.restore();
       }
     }
-    // STAT HUB painted in each end zone
-    const efs = Math.max(16, Math.min(vert ? W * 0.13 : H * 0.11, s * 6.2));
+    // FF STAT HUB painted in each end zone
+    const efs = Math.max(14, Math.min(vert ? W * 0.13 : H * 0.11, s * 6.2) * 0.75);   // 11 letters now, was 8
     g.font = `italic 900 ${efs}px "Arial Black",Impact,system-ui,sans-serif`;
     for (const [u, rot] of [[5, vert ? Math.PI : -Math.PI / 2], [115, vert ? 0 : Math.PI / 2]]) {
       const [x, y] = P(u, Wd / 2);
       g.save(); g.translate(x, y); g.rotate(rot);
-      g.fillStyle = "rgba(255,255,255,.08)"; g.fillText("STAT HUB", 3, 3);
-      g.strokeStyle = "rgba(167,139,250,.55)"; g.lineWidth = 2; g.strokeText("STAT HUB", 0, 0);
-      g.fillStyle = "rgba(255,255,255,.30)"; g.fillText("STAT HUB", 0, 0);
+      g.fillStyle = "rgba(255,255,255,.08)"; g.fillText("FF STAT HUB", 3, 3);
+      g.strokeStyle = "rgba(167,139,250,.55)"; g.lineWidth = 2; g.strokeText("FF STAT HUB", 0, 0);
+      g.fillStyle = "rgba(255,255,255,.30)"; g.fillText("FF STAT HUB", 0, 0);
       g.restore();
     }
     // night-game dimming so content on top stays readable

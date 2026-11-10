@@ -1,6 +1,6 @@
 {
-  "name": "Stat Hub",
-  "short_name": "Stat Hub",
+  "name": "FFStatHub",
+  "short_name": "FFStatHub",
   "description": "Half-PPR NFL stats, rankings, waivers, start/sit and trades.",
   "start_url": "./#/",
   "scope": "./",
