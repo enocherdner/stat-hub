@@ -9,9 +9,16 @@ const LAST_FANTASY_WEEK = 17;
 const BOT = "https://t.me/Clutchclips_bot";
 
 async function load(name) {
-  const r = await fetch(`data/${name}.json?v=30&t=${Date.now() / 600000 | 0}`);
-  if (!r.ok) throw new Error(name + " " + r.status);
-  return r.json();
+  // 10-minute cache key; if that copy is bad (e.g. a CDN-cached broken file), fetch a fresh one.
+  try {
+    const r = await fetch(`data/${name}.json?v=30&t=${Date.now() / 600000 | 0}`);
+    if (!r.ok) throw new Error(name + " " + r.status);
+    return await r.json();
+  } catch (e) {
+    const r = await fetch(`data/${name}.json?fresh=${Date.now()}`, {cache: "no-store"});
+    if (!r.ok) throw new Error(name + " " + r.status);
+    return r.json();
+  }
 }
 
 
