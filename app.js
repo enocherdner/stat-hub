@@ -1284,7 +1284,7 @@ V.ss = () => {
   if (n >= 2) {
     const res = V.ssIds.map(id => projectX(id, wk)).sort((x, y) => y.proj - x.proj);
     V.ssLast = {wk, res, start: V.ssN};
-    out = `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
+    out = anaPanel("startsit", [...res.map(x => x.id), "start" + V.ssN, rosterTag()], false) + `<div id="nums"><h2>Week ${wk} ranking · start ${V.ssN} of ${n}</h2>` + res.map((x, i) => `<div class="card rank"><div class="n">${i + 1}</div>
       <div class="grow"><a href="#/p/${x.id}"><b>${esc(x.p.name)}</b></a> <span class="muted small">${x.p.pos} · ${x.p.team}</span> ${injBadge(x.p)}
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
@@ -1372,16 +1372,17 @@ const ANA = {};   // key -> {status, text, ...}
 // Where write-ups get made: the iMac serves the site itself (same origin); on the public site the MacBook runs
 // the same service at localhost:8766 (stathub serve, launchd com.enoch.stathub-serve). The phone has neither.
 const API = /github\.io$|ffstathub\.com$/.test(location.hostname) ? "http://localhost:8766" : "";
+const ANA_SECS = kind => kind === "compare" || kind === "trade" ? "about 1–2 minutes" : "about 30–60 seconds";
 function anaKey(kind, ids) { return kind + ":" + (kind === "compare" ? [...ids].sort() : ids).join(","); }
 function anaPanel(kind, ids, auto) {
   const k = anaKey(kind, ids), st = ANA[k];
-  const label = kind === "compare" ? "Analysis" : kind === "trade" ? "Trade write-up" : kind === "profile" ? "Season write-up" : "Start/sit write-up";
+  const label = kind === "compare" ? "Analysis" : kind === "trade" ? "Trade write-up" : kind === "profile" ? "Season write-up" : "Why this call";
   let inner;
   if (!st || st.status === "none") inner = auto ? `<p class="muted small"><span class="spin"></span>Starting…</p>`
-    : `<button class="btn" data-act="ana" data-kind="${kind}">Write the analysis</button> <span class="muted small">about 30–60 seconds; checks this week's injury news</span>`;
-  else if (st.status === "working") inner = `<p class="muted small"><span class="spin"></span>Writing it now: pulling this week's injury and news context, then reading the numbers. About 30–60 seconds.</p>`;
+    : `<button class="btn" data-act="ana" data-kind="${kind}">${kind === "startsit" ? "Explain this call" : "Write the analysis"}</button> <span class="muted small">${ANA_SECS(kind)}; checks this week's injury news</span>`;
+  else if (st.status === "working") inner = `<p class="muted small"><span class="spin"></span>Writing it now: pulling this week's injury and news context, then reading the numbers. ${ANA_SECS(kind)[0].toUpperCase() + ANA_SECS(kind).slice(1)}.</p>`;
   else if (st.status === "error") inner = `<p class="small v-bad">${esc(st.error || "Couldn't write it.")}</p><button class="btn ghost sm" data-act="ana" data-kind="${kind}">Try again</button>`;
-  else if (st.status === "offline") inner = `<p class="small muted">New write-ups are made on your MacBook or the iMac. Open this page on the MacBook (any network), or at home open <a href="http://192.168.68.62:8765/${location.hash}">the iMac version</a>. Ones already written show up here too.</p>`;
+  else if (st.status === "offline") inner = `<p class="small muted">Can't write this one right now. Try again later.</p>`;
   else inner = md(st.text) + `<p class="note">Written ${when(st.at)} from the numbers ${kind === "profile" ? "on this page" : "above"} plus a web check of injuries and news. Saved ${kind === "profile" ? "until next week's stats land" : "for today"}, so reopening it is free.</p>`;
   return `<div class="ana" id="ana" data-kind="${kind}" data-ids="${ids.join(",")}"><div class="lbl">${label}</div>${inner}</div>`;
 }
