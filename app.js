@@ -996,15 +996,25 @@ V.compare = (a, b) => {
 };
 
 /* ---- news ---- */
+/* Top news = what changes a lineup or a roster: injuries and practice status, IR, trades, signings,
+   releases, suspensions, starting / depth-chart / role changes. Everything else (game recaps) is in All news. */
+const BIG_NEWS = /injur|\bout\b|ruled out|questionable|doubtful|\bIR\b|injured reserve|placed on|activated|designated (him |\w+ )?(for|to) return|concussion|hamstring|ankle|knee|groin|calf|shoulder|foot\b|toe\b|back\b|achilles|acl\b|mcl\b|surgery|torn|fracture|sprain|strain|season-ending|week-to-week|day-to-day|traded|\btrade\b|acquired|signed|re-signed|released|waived|\bcut\b|claimed|suspend|benched|bench|named (the )?starter|will start|to start|starting (job|role|qb|quarterback|running back)|lead back|workhorse|demoted|promoted|depth chart|elevated|practice|\bDNP\b|did not practice|limited|full participant|return(s|ed|ing)? (to|from)|retire|reinstated|activated|holdout|expected to miss|will miss|miss(es)? time|sidelined|exits?|left (the game|sunday)|carted|evaluated|MRI|status|inactive|arrest|personal reasons|out for the season|\bPUP\b|game-time decision/i;
+function isBig(c) {
+  const it = (c.items || [])[0] || {};
+  if (it.status || it.injury) return true;
+  return BIG_NEWS.test(it.head || "");
+}
 V.news = () => {
   setTab("news");
-  const filt = V.news.f || "all";
+  const filt = V.news.f || "all", nv = V.news.v || "top";
   const mine = new Set(roster());
-  let cards = D.news.cards;
+  let cards = nv === "top" ? D.news.cards.filter(isBig) : D.news.cards;
+  const nTop = D.news.cards.filter(isBig).length;
   if (filt === "mine") cards = cards.filter(c => mine.has(c.pid));
   else if (filt !== "all") cards = cards.filter(c => (BY[c.pid]?.pos || c.pos) === filt);
   return `<h1>News</h1>
-  <p class="muted small">One card per player. A new report updates the card; repeats are folded in. Updated ${ago(D.news.updated)}.</p>
+  <div class="subtabs"><button class="${nv === "top" ? "on" : ""}" data-nv="top">Top news (${nTop})</button><button class="${nv === "all" ? "on" : ""}" data-nv="all">All news</button></div>
+  <p class="muted small">${nv === "top" ? "Injuries, practice reports, IR, trades, signings, releases and role or depth-chart changes." : "Everything, including game recaps."} One card per player. Updated ${ago(D.news.updated)}.</p>
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
   <div class="news-grid">${cards.slice(0, 120).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
@@ -1239,7 +1249,7 @@ let lastHash = "";
 window.addEventListener("hashchange", () => { if (location.hash.split("/")[1] !== lastHash.split("/")[1] || location.hash.startsWith("#/p") || location.hash.startsWith("#/c")) scrollTo(0, 0); lastHash = location.hash; render(); });
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-setink],[data-ssg],[data-mxs],[data-wpos],[data-wv],[data-own],[data-sched]");
+  const t = e.target.closest("[data-act],[data-pos],[data-nf],[data-nv],[data-rm],[data-addss],[data-ssn],[data-view],[data-theme],[data-setink],[data-ssg],[data-mxs],[data-wpos],[data-wv],[data-own],[data-sched]");
   if (!t) return;
   if (t.dataset.pos) { V.home.pos = t.dataset.pos; render(); return; }
   if (t.dataset.view) { V.home.view = t.dataset.view; render(); return; }
@@ -1250,6 +1260,7 @@ document.addEventListener("click", e => {
   if (t.dataset.setink) { try { localStorage.setItem("ink", t.dataset.setink); } catch {} document.documentElement.dataset.ink = t.dataset.setink; render(); return; }
   if (t.dataset.theme) { try { localStorage.setItem("theme", t.dataset.theme); } catch {} document.documentElement.dataset.look = t.dataset.theme; render(); window.dispatchEvent(new Event("resize")); document.dispatchEvent(new Event("visibilitychange")); return; }
   if (t.dataset.nf) { V.news.f = t.dataset.nf; render(); return; }
+  if (t.dataset.nv) { V.news.v = t.dataset.nv; render(); return; }
   if (t.dataset.rm) { V[t.dataset.rm] = V[t.dataset.rm].filter(x => x !== t.dataset.id); if (t.dataset.rm === "rIds") setRoster(V.rIds); render(); return; }
   if (t.dataset.ssn) { V.ssN = +t.dataset.ssn; render(); return; }
   if (t.dataset.ssg) { ssFromRoster(t.dataset.ssg); render(); return; }
