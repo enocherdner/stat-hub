@@ -29,7 +29,7 @@ function applyScoring() {
     p.gp = ws.length; p.ppg = ws.length ? Math.round(ws.reduce((a, w) => a + w[pi], 0) / ws.length * 10) / 10 : 0;
   }
   D.players.sort((a, b) => b.ppg - a.ppg || a.name.localeCompare(b.name));
-  ROS_BY_RANK = null; SCF = {};
+  ROS_BY_RANK = null; SCF = {}; LEAGUE = null;
 }
 /* Expert projections are half-PPR; scale each player's by how his own season changes under the chosen scoring. */
 let SCF = {};
@@ -377,9 +377,9 @@ function luck(id) {
 }
 function luckTag(id) {
   const L = luck(id); if (!L || !L.tag) return "";
-  const why = L.flags.map(f => f.t).join(" ");
-  return L.tag === "hot" ? tipTag("sig sell", "HOT · SELL", `Why sell: ${why} He's scoring more than his usage supports, so his trade value is likely at its peak.`)
-                         : tipTag("sig buy", "DUE · BUY", `Why buy: ${why} His usage says better days are coming, so he may be cheap to trade for right now.`);
+  const why = luckExplain(id);
+  return L.tag === "hot" ? tipTag("sig sell", "HOT · SELL", `Why sell ${BY[id].name}: ${why}`)
+                         : tipTag("sig buy", "DUE · BUY", `Why buy ${BY[id].name}: ${why}`);
 }
 
 
@@ -405,6 +405,68 @@ document.addEventListener("click", e => {
 }, true);
 document.addEventListener("keydown", e => { const el = e.target.closest && e.target.closest(".has-tip"); if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); showTip(el); } });
 addEventListener("scroll", () => { const t = document.getElementById("tip"); if (t) t.hidden = true; }, {passive: true});
+
+
+/* Player-specific "why sell / why buy": his numbers vs the league, his team, his schedule, and a fair value. */
+let LEAGUE = null;
+function leagueCtx() {
+  if (LEAGUE) return LEAGUE;
+  const pos = {}, team = {};
+  for (const p of D.players) {
+    const ws = weeks(p.id); if (!ws.length) continue;
+    const a = agg(ws), L = (D.luck.players || {})[p.id];
+    (pos[p.pos] = pos[p.pos] || []).push({id: p.id, a, td: L ? L[1] : null, xtd: L ? L[0] : null});
+    for (const w of ws) { const t = team[w.team] || (team[w.team] = {}); t[w.wk] = Math.max(t[w.wk] || 0, (w.tmc || 0) + (w.tmt || 0)); }
+  }
+  const vol = Object.entries(team).map(([t, wk]) => [t, Object.values(wk).reduce((x, y) => x + y, 0) / Object.keys(wk).length]).sort((x, y) => y[1] - x[1]);
+  return (LEAGUE = {pos, volRank: Object.fromEntries(vol.map(([t, v], i) => [t, {v, rank: i + 1}]))});
+}
+function rankOf(list, id, val, min) {
+  const xs = list.filter(x => min(x.a)).map(x => [x.id, val(x.a)]).filter(x => x[1] != null).sort((a, b) => b[1] - a[1]);
+  const i = xs.findIndex(x => x[0] === id);
+  return i < 0 ? null : {rank: i + 1, n: xs.length};
+}
+function luckExplain(id) {
+  const p = BY[id], L = luck(id); if (!p || !L) return "";
+  const S = summary(id), a = S.s, ctx = leagueCtx(), list = ctx.pos[p.pos] || [], eff = posEff()[p.pos] || {};
+  const hot = L.tag === "hot", out = [];
+  // 1) touchdowns vs his usage
+  const tdDiff = L.td - L.xtd;
+  if (Math.abs(tdDiff) >= 1.5) out.push(p.pos === "QB"
+    ? `${L.td} rushing TDs, but his carries (${a.rzc} in the red zone, ${a.glc} inside the 5) usually produce about ${L.xtd.toFixed(1)}. That's ${Math.abs(tdDiff).toFixed(1)} ${tdDiff > 0 ? "more" : "fewer"} than expected.`
+    : `${L.td} TDs, but his touches (${a.rz} in the red zone, ${a.gl} inside the 5) usually produce about ${L.xtd.toFixed(1)}. That's ${Math.abs(tdDiff).toFixed(1)} ${tdDiff > 0 ? "more" : "fewer"} than expected.`);
+  // 2) efficiency vs the position, with his rank
+  if (p.pos === "RB" && a.ypc != null && eff.ypc) {
+    const r = rankOf(list, id, x => x.ypc, x => x.car >= 60);
+    out.push(`${a.ypc.toFixed(1)} yards per carry vs ${eff.ypc.toFixed(1)} for RBs${r ? ` (${ord(r.rank)} of ${r.n})` : ""}.`);
+  } else if ((p.pos === "WR" || p.pos === "TE") && a.ypt != null && eff.ypt) {
+    const r = rankOf(list, id, x => x.ypt, x => x.tgt >= 35);
+    out.push(`${a.ypt.toFixed(1)} yards per target vs ${eff.ypt.toFixed(1)} for ${p.pos}s${r ? ` (${ord(r.rank)} of ${r.n})` : ""}.`);
+  }
+  // 3) his role and his team
+  const sh = share(p.pos, a), sh4 = share(p.pos, S.l4);
+  if (sh != null) {
+    const r = rankOf(list, id, x => share(p.pos, x), x => x.g >= 4);
+    out.push(`He gets ${pct(sh)} of ${p.team}'s ${p.pos === "RB" ? "carries and targets" : "targets"}${r ? ` (${ord(r.rank)} among ${p.pos}s)` : ""}${S.l4gp >= 2 && Math.abs(sh4 - sh) >= 0.04 ? `, ${sh4 > sh ? "up" : "down"} to ${pct(sh4)} over the last ${S.l4gp}` : ""}.`);
+  }
+  const tv = ctx.volRank[p.team];
+  if (tv) out.push(`${p.team} runs ${Math.round(tv.v)} plays a game (${ord(tv.rank)} most in the NFL).`);
+  // 4) the schedule ahead
+  const up = nextGames(p.team, nextWeek()).slice(0, 4);
+  if (up.length) {
+    const tags = up.map(g => { const f = matchupFactor(g[1], p.pos).f; return f > 1.03 ? "easy" : f < 0.97 ? "tough" : "avg"; });
+    const e = tags.filter(t => t === "easy").length, h = tags.filter(t => t === "tough").length;
+    out.push(`Next ${up.length}: ${up.map(g => (g[2] ? "" : "@") + g[1]).join(", ")} (${e} easy, ${h} tough).`);
+  }
+  // 5) fair value once the luck evens out
+  let adj = -tdDiff * 6;
+  if (p.pos === "RB" && a.ypc != null && eff.ypc) adj -= (a.ypc - eff.ypc) * a.car * 0.1 * 0.5;
+  if ((p.pos === "WR" || p.pos === "TE") && a.ypt != null && eff.ypt) adj -= (a.ypt - eff.ypt) * a.tgt * 0.1 * 0.5;
+  const fair = S.gp ? Math.max(0, a.ppg + adj / S.gp) : a.ppg;
+  out.push(hot ? `Fair value is about ${f1(fair)} ${SCL()} pts/game, not his ${f1(a.ppg)}. Sell if someone pays for the ${f1(a.ppg)}.`
+               : `Fair value is about ${f1(fair)} ${SCL()} pts/game, above his ${f1(a.ppg)}. Buy while he's priced off the ${f1(a.ppg)}.`);
+  return out.join(" ");
+}
 
 /* ---------------- usage charts (inline SVG, one series each) ---------------- */
 function spark(title, pts, fmt, max) {
@@ -826,7 +888,8 @@ V.player = id => {
 function luckBlock(id) {
   const L = luck(id); if (!L) return "";
   const tdLine = `<b style="color:var(--ink)">${L.td}</b> TDs vs <b style="color:var(--ink)">${L.xtd.toFixed(1)}</b> expected from where his carries and targets came (league TD rate from each spot on the field).`;
-  return `<h2>Lucky or real</h2><div class="card small ink2">${tdLine}${L.flags.length ? `<ul class="why">${L.flags.map(f => `<li class="${f.k === "hot" ? "v-bad" : "v-good"}">${esc(f.t)}</li>`).join("")}</ul>` : `<div style="margin-top:4px">Nothing unusual: his scoring matches his usage.</div>`}</div>`;
+  const ex = L.tag ? `<p style="margin:8px 0 0">${esc(luckExplain(id))}</p>` : "";
+  return `<h2>Lucky or real</h2><div class="card small ink2">${tdLine}${ex}${L.flags.length ? `<ul class="why">${L.flags.map(f => `<li class="${f.k === "hot" ? "v-bad" : "v-good"}">${esc(f.t)}</li>`).join("")}</ul>` : `<div style="margin-top:4px">Nothing unusual: his scoring matches his usage.</div>`}</div>`;
 }
 function byeWeek(team) {
   const wks = new Set((D.teams.sched[team] || []).map(g => g[0]));
