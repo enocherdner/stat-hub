@@ -533,8 +533,8 @@ function defRow(d, i) {
    matchup. Once a game is played, the row shows what he actually scored, so you can see who the experts missed. */
 const WEEK_LEN = {QB: 36, RB: 60, WR: 72, TE: 36, FLEX: 150, K: 32, DEF: 32};
 function gradeCls(g) { return !g ? "" : g[0] === "A" ? "v-good" : g[0] === "B" ? "" : "v-bad"; }
-function fpWeeklyList(pos) {
-  const W = D.weekly || {}, all = (W.pos || {})[pos] || [];
+function fpWeeklyList(pos, W0) {
+  const W = W0 || D.weekly || {}, all = (W.pos || {})[pos] || [];
   if (!all.length) return `<p class="muted">Weekly rankings aren't loaded yet. They refresh every 3 hours.</p>`;
   const wk = Number(W.week), done = all.filter(r => r.status === "closed").length;
   const lbl = pos === "FLEX" ? "FLEX" : pos;
@@ -582,7 +582,8 @@ function takeChip(t, ffb) {
 function weeklyList(pos) {
   const C = D.consensus || {}, T = C.week, rel = C.release ? new Date(C.release) : null;
   if (rel && Date.now() < rel) {
-    const recap = Number((D.weekly || {}).week) === T - 1 ? `<h2>Week ${T - 1} recap: expert projections vs what they scored</h2>` + fpWeeklyList(pos) : "";
+    const P = Number((D.weeklyPrev || {}).week) === T - 1 ? D.weeklyPrev : Number((D.weekly || {}).week) === T - 1 ? D.weekly : null;
+    const recap = P ? `<h2>Week ${T - 1} recap: expert projections vs what they scored</h2>` + fpWeeklyList(pos, P) : "";
     return lockCard(`Week ${T} rankings drop ${CT_FMT(rel)} CT`, `They're a consensus of FantasyPros' experts, RotoWire, ESPN and the Fantasy Footballers, and they keep updating through the week.`) + recap;
   }
   const rows = (C.pos || {})[pos];
@@ -1231,6 +1232,7 @@ document.addEventListener("click", e => {
     D.kdef = await load("kdef").catch(() => ({K: [], DEF: []}));
     D.ros = await load("ros").catch(() => ({players: []}));
     D.weekly = await load("weekly").catch(() => ({pos: {}}));
+    D.weeklyPrev = await load("weekly_prev").catch(() => ({pos: {}}));
     D.consensus = await load("consensus").catch(() => ({}));
     D.wcons = await load("waiver_consensus").catch(() => ({players: []}));
     D.luck = await load("luck").catch(() => ({players: {}}));
