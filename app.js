@@ -1377,8 +1377,10 @@ function anaKey(kind, ids) { return kind + ":" + (kind === "compare" ? [...ids].
 function anaPanel(kind, ids, auto) {
   const k = anaKey(kind, ids), st = ANA[k];
   const label = kind === "compare" ? "Analysis" : kind === "trade" ? "Trade write-up" : kind === "profile" ? "Season write-up" : "Why this call";
+  // No box at all until we know a write-up exists or can be made, and none when it can't (e.g. phone away from home).
+  if (!st || st.status === "offline") return `<div id="ana" data-kind="${kind}" data-ids="${ids.join(",")}" hidden></div>`;
   let inner;
-  if (!st || st.status === "none") inner = auto ? `<p class="muted small"><span class="spin"></span>Starting…</p>`
+  if (st.status === "none") inner = auto ? `<p class="muted small"><span class="spin"></span>Starting…</p>`
     : `<button class="btn" data-act="ana" data-kind="${kind}">${kind === "startsit" ? "Explain this call" : "Write the analysis"}</button> <span class="muted small">${ANA_SECS(kind)}; checks this week's injury news</span>`;
   else if (st.status === "working") inner = `<p class="muted small"><span class="spin"></span>Writing it now: pulling this week's injury and news context, then reading the numbers. ${ANA_SECS(kind)[0].toUpperCase() + ANA_SECS(kind).slice(1)}.</p>`;
   else if (st.status === "error") inner = `<p class="small v-bad">${esc(st.error || "Couldn't write it.")}</p><button class="btn ghost sm" data-act="ana" data-kind="${kind}">Try again</button>`;
