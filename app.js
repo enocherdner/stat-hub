@@ -9,7 +9,7 @@ const LAST_FANTASY_WEEK = 17;
 const BOT = "https://t.me/Clutchclips_bot";
 
 async function load(name) {
-  const r = await fetch(`data/${name}.json?t=${Date.now() / 600000 | 0}`);
+  const r = await fetch(`data/${name}.json?v=30&t=${Date.now() / 600000 | 0}`);
   if (!r.ok) throw new Error(name + " " + r.status);
   return r.json();
 }
