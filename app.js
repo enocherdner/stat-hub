@@ -906,7 +906,9 @@ function rosList(pos) {
     r.gap = gap;
   });
   const lbl = pos === "FLEX" ? "FLEX" : pos;
-  const body = rows.map((r, i) => {
+  // show in OUR order (best ROS points first); players we can't score yet go to the bottom in expert order
+  const shown = [...scored, ...rows.filter(r => r.ours == null)];
+  const body = shown.map((r, i) => {
     const p = r.id ? BY[r.id] : null;
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`;
     const sig = r.sig ? tipTag(`sig ${r.sig === "BUY" ? "buy" : "sell"}`, r.sig, `Experts rank him ${lbl}${r.ecrRank}; our numbers rank him ${lbl}${r.ourRank}. ${r.sig === "BUY" ? "Our numbers like him more than the experts do, so he may be undervalued: a good time to trade for him." : "Our numbers like him less than the experts do, so he may be overvalued: a good time to trade him away."}${r.det ? " Why: " + sigWhy(r) + "." : ""}`) : "";
@@ -915,7 +917,7 @@ function rosList(pos) {
       <span class="r"><b>${r.ours == null ? "–" : f1(r.ours)}</b><br><span class="muted tiny">our ROS pts</span></span></div>`;
   }).join("");
   const buys = rows.filter(r => r.sig === "BUY").length, sells = rows.filter(r => r.sig === "SELL").length;
-  return `<p class="muted small">Expert consensus order (FantasyPros).
+  return `<p class="muted small">Ordered by our ROS points; expert rank (FantasyPros) under each name.
  ${buys} buys · ${sells} sells (tap ⓘ on a tag for why).</p>
   <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
 }
