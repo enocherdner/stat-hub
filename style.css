@@ -278,3 +278,5 @@ td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;
 .has-tip .ib{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;border:1px solid currentColor;font:italic 700 9px/1 Georgia,serif;margin-left:3px;vertical-align:1px;opacity:.85}
 #tip{position:fixed;z-index:60;background:#0d1326;color:#e8ecf8;border:1px solid rgba(167,139,250,.6);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.5);text-shadow:none}
 #tip[hidden]{display:none}
+
+.scoring{flex:none;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 8px;font:600 13px Inter,system-ui,sans-serif;margin-left:8px;max-width:112px}
