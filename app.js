@@ -569,7 +569,7 @@ function ppgList(pos) {
   }
   const note = pos === "K" ? "Kickers: FG 0–39 = 3, 40–49 = 4, 50+ = 5, PAT = 1."
     : pos === "DEF" ? "Defenses: sack 1, INT / fumble rec / safety / block 2, TD 6, plus points-allowed tiers (0 = 10 … 35+ = −4)." : "";
-  return `<p class="muted small">${SCU()} points per game (and ${D.meta.season} season total) · top ${n} · at least ${MIN_GP} games played.</p>
+  return `<p class="muted small">${SCU()} · min ${MIN_GP} games</p>
   <div class="card list">${list || '<p class="muted">No data yet.</p>'}</div>${note ? `<p class="note">${note}</p>` : ""}`;
 }
 function ppgTable(ps) {
@@ -707,8 +707,8 @@ function rosList(pos) {
       <span class="r"><b>${r.ours == null ? "–" : f1(r.ours)}</b><br><span class="muted tiny">our ROS pts</span></span></div>`;
   }).join("");
   const buys = rows.filter(r => r.sig === "BUY").length, sells = rows.filter(r => r.sig === "SELL").length;
-  return `<p class="muted small">Ordered by the expert consensus (${esc(D.ros.source || "FantasyPros")}). Our ROS points = per-game value × each remaining opponent through week ${LAST_FANTASY_WEEK} × teammate changes × injuries.
-  <b class="v-good">BUY</b> = our numbers rank him well above the experts; <b class="v-bad">SELL</b> = well below. ${buys} buys · ${sells} sells.</p>
+  return `<p class="muted small">Expert consensus order (FantasyPros).
+ ${buys} buys · ${sells} sells (tap ⓘ on a tag for why).</p>
   <div class="card list">${body || '<p class="muted">No consensus data yet.</p>'}</div>`;
 }
 function plRow(p, i) {
@@ -902,8 +902,7 @@ V.waivers = () => {
   ${filters}
   <div class="only-narrow">${list.slice(0, 60).map(card).join("") || '<p class="muted">Nothing flagged yet.</p>'}</div>
   <div class="only-wide card"><table class="rt"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Rostered</th><th>Opps gained</th><th>Why</th><th>Adds 48h</th><th>PPG</th></tr></thead><tbody>
-  ${list.slice(0, 60).map((e, i) => { const p = BY[e.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)} ${mine.has(e.id) ? '<span class="badge">mine</span>' : ""}</td><td>${p.pos}</td><td>${p.team}</td><td>${e.own == null ? "–" : e.own.toFixed(0) + "%"}</td><td><b>+${f1(e.gain)}</b></td><td class="wrapcell">${e.reasons.map(esc).join("<br>")}${e.starter?.news ? `<br><span class="muted">News: ${esc(e.starter.news.head)}</span>` : ""}</td><td>${e.trend ? e.trend.toLocaleString() : "–"}</td><td>${f1(BY[e.id] ? BY[e.id].ppg : e.ppg)}</td></tr>`; }).join("")}</tbody></table></div>
-  <p class="note">Route share isn't in the free data, so snap % and target share stand in for it.</p>`;
+  ${list.slice(0, 60).map((e, i) => { const p = BY[e.id]; return `<tr><td>${rnk(i)}</td><td><a href="#/p/${p.id}">${esc(p.name)}</a> ${injBadge(p)} ${mine.has(e.id) ? '<span class="badge">mine</span>' : ""}</td><td>${p.pos}</td><td>${p.team}</td><td>${e.own == null ? "–" : e.own.toFixed(0) + "%"}</td><td><b>+${f1(e.gain)}</b></td><td class="wrapcell">${e.reasons.map(esc).join("<br>")}${e.starter?.news ? `<br><span class="muted">News: ${esc(e.starter.news.head)}</span>` : ""}</td><td>${e.trend ? e.trend.toLocaleString() : "–"}</td><td>${f1(BY[e.id] ? BY[e.id].ppg : e.ppg)}</td></tr>`; }).join("")}</tbody></table></div>`;
 };
 
 /* Expert waiver consensus: who the free expert articles say to add, Footballers (article + podcast) counted double. */
@@ -985,7 +984,7 @@ V.compare = (a, b) => {
   ${anaPanel("compare", [a, b], true)}
   <div id="nums"><div class="scroll" style="margin-top:10px"><table class="cmp"><thead><tr><th></th><th><a href="#/p/${a}">${esc(A.name)}</a><br><span class="muted">${A.pos} · ${A.team}</span></th><th><a href="#/p/${b}">${esc(B.name)}</a><br><span class="muted">${B.pos} · ${B.team}</span></th></tr></thead>
   <tbody>${rows.join("")}</tbody></table></div>
-  <p class="note">Green = the better number.</p>
+  
   <div class="row wrap" style="margin:10px 0"><a class="btn ghost sm" href="#/c/${b}/${a}">Swap</a><button class="btn ghost sm" data-act="ss2" data-ids="${a},${b}">Start/Sit these two</button></div>
   ${roomTable(a)}${roomTable(b)}
   ${[a, b].map(id => { const P = projectX(id, wk); return `<h2>${esc(BY[id].name)}: week ${wk} factors</h2><ul class="why">${P.why.map(w => `<li>${esc(w.t)}</li>`).join("")}</ul>`; }).join("")}
@@ -1014,7 +1013,7 @@ V.news = () => {
   else if (filt !== "all") cards = cards.filter(c => (BY[c.pid]?.pos || c.pos) === filt);
   return `<h1>News</h1>
   <div class="subtabs"><button class="${nv === "top" ? "on" : ""}" data-nv="top">Top news (${nTop})</button><button class="${nv === "all" ? "on" : ""}" data-nv="all">All news</button></div>
-  <p class="muted small">${nv === "top" ? "Injuries, practice reports, IR, trades, signings, releases and role or depth-chart changes." : "Everything, including game recaps."} Updated ${ago(D.news.updated)}.</p>
+  <p class="muted small">Updated ${ago(D.news.updated)}.</p>
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
   <div class="news-grid">${cards.slice(0, 120).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
@@ -1061,7 +1060,7 @@ V.ss = () => {
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
       <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span><div class="tiny muted" style="margin-top:4px">${x.bye ? "" : `${f1(x.floor)}–${f1(x.ceil)}`}</div></div></div>`).join("") +
-      `</div><p class="note">${roster().length ? "Your roster is factored into the write-up (depth, byes, who else you could start). " : ""}Ranked across positions on projected ${SCL()} points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. ${expertPending(wk) ? `The week ${wk} expert consensus lands ${CT_FMT(expertPending(wk))} CT; until then this is our numbers only: ` : `Projection = 60% expert consensus (Fantasy Footballers, FantasyPros, RotoWire, ESPN) + 40% our numbers. Ours = `}60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
+      `</div><p class="note">${roster().length ? "Your roster is factored into the write-up (depth, byes, who else you could start). " : ""}Projection = expert consensus blended with our usage, matchup and injury numbers.</p>
       <button class="btn ghost" data-act="ask-ss">Ask the coach on Telegram</button>`;
   }
   return `<h1>Start / Sit</h1><p class="muted small"><b>Week ${wk} start/sit</b> (games ${weekDates(wk)}). Add 3 or more players, any positions. It ranks them all like a FLEX call.</p>
@@ -1096,7 +1095,7 @@ V.trade = () => {
       ${tbl(G, "You give")}${tbl(R, "You get")}
       ${roster().length ? `<p class="note">Your roster is factored into the write-up (positional need, depth, byes).</p>` : `<p class="note">Add your players on the My Roster tab and the write-up will weigh positional need, depth and byes.</p>`}</div>
       ${anaPanel("trade", [...V.give, "|", ...V.get, rosterTag()], false)}
-      <p class="note">ROS points = 50% expert consensus (FantasyPros rest-of-season rank, turned into points) + 50% our numbers. Ours = per-game value (75% season + 25% last 4, × usage trend: last-4 share vs season, half weight) × each remaining opponent's points allowed to the position (half weight) × room changes, minus games lost to injury (IR = 4 weeks, Out = 1). Byes counted. Sched 1.00 = average; higher = easier.</p>
+      <p class="note">Value = expert rest-of-season ranks blended with our numbers, through week ${LAST_FANTASY_WEEK}.</p>
       <button class="btn" data-act="ask-trade">Ask the coach</button> <span class="muted small">copies the numbers and opens @Clutchclips_bot</span>`;
   }
   return `<h1>Trade analyzer</h1><p class="muted small">Rest of season: weeks ${nextWeek()}–${LAST_FANTASY_WEEK}, experts + our numbers.</p>
