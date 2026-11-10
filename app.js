@@ -1207,7 +1207,21 @@ V.compare = (a, b) => {
 /* Top news = what changes a lineup or a roster: injuries and practice status, IR, trades, signings,
    releases, suspensions, starting / depth-chart / role changes. Everything else (game recaps) is in All news. */
 const BIG_NEWS = /injur|\bout\b|ruled out|questionable|doubtful|\bIR\b|injured reserve|placed on|activated|designated (him |\w+ )?(for|to) return|concussion|hamstring|ankle|knee|groin|calf|shoulder|foot\b|toe\b|back\b|achilles|acl\b|mcl\b|surgery|torn|fracture|sprain|strain|season-ending|week-to-week|day-to-day|traded|\btrade\b|acquired|signed|re-signed|released|waived|\bcut\b|claimed|suspend|benched|bench|named (the )?starter|will start|to start|starting (job|role|qb|quarterback|running back)|lead back|workhorse|demoted|promoted|depth chart|elevated|practice|\bDNP\b|did not practice|limited|full participant|return(s|ed|ing)? (to|from)|retire|reinstated|activated|holdout|expected to miss|will miss|miss(es)? time|sidelined|exits?|left (the game|sunday)|carted|evaluated|MRI|status|inactive|arrest|personal reasons|out for the season|\bPUP\b|game-time decision/i;
+let ROS_RANK = null;
+function relevant(c) {
+  // fantasy-relevant players only: experts' top 250 rest-of-season, 8+ ppg (half PPR base), on his roster,
+  // or a QB starting change
+  if (!ROS_RANK) { ROS_RANK = {}; for (const r of (D.ros.players || [])) if (r.id) ROS_RANK[r.id] = r.ecr; }
+  const p = BY[c.pid], it = (c.items || [])[0] || {};
+  if (roster().includes(c.pid)) return true;
+  if (ROS_RANK[c.pid] && ROS_RANK[c.pid] <= 250) return true;
+  const half = (D.statsHalf || D.stats)[c.pid] || [], pi = D.meta.fields.indexOf("pts");
+  if (half.length >= 2 && half.reduce((a, w) => a + w[pi], 0) / half.length >= 8) return true;
+  if ((p?.pos || c.pos) === "QB" && /start/i.test(it.head || "")) return true;
+  return false;
+}
 function isBig(c) {
+  if (!relevant(c)) return false;
   const it = (c.items || [])[0] || {};
   if (it.status || it.injury) return true;
   return BIG_NEWS.test(it.head || "");
