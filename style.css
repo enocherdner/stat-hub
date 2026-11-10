@@ -184,7 +184,7 @@ table.mx td.po{box-shadow:inset 0 2px 0 rgba(245,197,66,.55),inset 0 -2px 0 rgba
 html{background:#0b2a18}
 body{background:transparent!important}
 #field{position:fixed;inset:0;width:100vw;height:100vh;z-index:-1;pointer-events:none;display:block}
-#playcap{position:fixed;left:12px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:5;font-size:11px;color:rgba(255,255,255,.55);background:rgba(7,12,24,.45);padding:3px 8px;border-radius:8px;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#playcap{position:fixed;left:12px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:5;font-size:11px;color:rgba(255,255,255,.55);background:rgba(7,12,24,.45);padding:3px 8px;border-radius:8px;max-width:78vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:1px solid rgba(255,255,255,.18);font-family:inherit;line-height:1.5;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 @media (min-width:1024px){#playcap{bottom:14px;left:16px;font-size:12px}}
 :root[data-look="gameday"] .top{background:rgba(7,12,24,.78)!important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:3px solid #7c3aed}
 :root[data-look="gameday"] .tabs{background:rgba(7,12,24,.84);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
@@ -325,3 +325,18 @@ table.rt tbody td:last-child{border-right:1px solid var(--line);border-radius:0 
 .roster-cta.on .go{background:transparent;color:var(--ink2);border:1px solid var(--line)}
 .hdr-roster .lbl{display:none}
 @media (min-width:700px){.hdr-roster{width:auto;padding:0 10px;display:flex;gap:6px;font-size:14px;color:var(--ink)}.hdr-roster .lbl{display:inline;font-weight:600}}
+#playcap .i{display:inline-grid;place-items:center;width:15px;height:15px;margin-left:4px;border-radius:50%;background:rgba(167,139,250,.85);color:#fff;font:700 10px/1 Georgia,serif;font-style:italic;vertical-align:-2px}
+#playcap:hover,#playcap:focus-visible{color:#fff;background:rgba(7,12,24,.8)}
+#playtip{position:fixed;left:12px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:61;width:min(360px,calc(100vw - 24px));background:#0d1326;color:#e8ecf8;border:1px solid rgba(167,139,250,.6);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+#playtip[hidden]{display:none}
+#playtip .x{position:absolute;top:6px;right:8px;background:none;border:0;color:#aab;font-size:15px;padding:4px 6px;cursor:pointer}
+#playtip b{display:block;padding-right:22px;margin-bottom:4px}
+#playtip .m{color:#b9c0d8;font-size:12px}
+#playtip .d{margin-top:8px;font-style:italic}
+#playtip .src{font-size:11px;color:#8a93ad;margin-top:2px}
+#playtip .n{font-size:11px;color:#8a93ad;margin-top:8px;border-top:1px solid rgba(255,255,255,.1);padding-top:6px}
+@media (min-width:1024px){#playtip{bottom:48px;left:16px}}
+:root[data-look="classic"] #playtip{display:none}
+.addrow{display:flex;gap:10px;align-items:flex-start;margin-top:12px}
+.plus-btn{flex:none;width:48px;height:46px;border-radius:12px;border:0;background:linear-gradient(135deg,#7c3aed,#3ba3ff);color:#fff;font-size:28px;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(124,58,237,.45)}
+.plus-btn:active{transform:scale(.96)}

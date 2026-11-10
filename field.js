@@ -3,12 +3,31 @@
    data, so the route shape is illustrative. No Claude, no libraries: one canvas, the field cached offscreen. */
 (function () {
   "use strict";
-  const NOTE = "Real plays from nflverse play-by-play: start spot, pass depth, side of the field, run gap, yards gained, result and players are real. The exact steps are reconstructed (free data has no player tracking): routes come from the route tree that fits the real depth and side.";
+  const NOTE = "Real play from the official NFL play-by-play: start spot, side, run gap, pass depth, yards and result are real. Player steps are drawn from those (no player tracking data is public).";
   const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const cv = document.createElement("canvas"); cv.id = "field"; cv.setAttribute("aria-hidden", "true");
   document.body.prepend(cv);
-  const cap = document.createElement("div"); cap.id = "playcap"; cap.title = NOTE; cap.setAttribute("aria-live", "off");
+  const cap = document.createElement("button"); cap.id = "playcap"; cap.type = "button"; cap.setAttribute("aria-live", "off");
+  cap.setAttribute("aria-label", "About this play");
   document.body.appendChild(cap);
+  const tip = document.createElement("div"); tip.id = "playtip"; tip.hidden = true; tip.setAttribute("role", "dialog");
+  document.body.appendChild(tip);
+  let held = false;   // while the info card is open, keep replaying the same play
+  const escH = t => String(t || "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  function openTip() {
+    const p = plays[idx]?.p; if (!p) return;
+    const meta = [p.matchup, p.dd && p.spot ? `${p.dd} at ${p.spot}` : p.dd, p.score ? `Score before the play: ${p.score}` : ""].filter(Boolean);
+    tip.innerHTML = `<button class="x" type="button" aria-label="Close">✕</button><b>${escH(p.caption)}</b>`
+      + meta.map(m => `<div class="m">${escH(m)}</div>`).join("")
+      + (p.desc ? `<div class="d">“${escH(p.desc)}”</div><div class="src">Official play-by-play</div>` : "")
+      + `<div class="n">${escH(NOTE)}</div>`;
+    tip.hidden = false; held = true;
+  }
+  function closeTip() { tip.hidden = true; held = false; }
+  cap.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); tip.hidden ? openTip() : closeTip(); });
+  tip.addEventListener("click", e => { e.stopPropagation(); if (e.target.closest(".x")) closeTip(); });
+  document.addEventListener("click", () => { if (!tip.hidden) closeTip(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !tip.hidden) closeTip(); });
   const ctx = cv.getContext("2d");
   const bg = document.createElement("canvas"), bctx = bg.getContext("2d");
   let W = 0, H = 0, dpr = 1, vert = false, plays = [], idx = 0, t0 = 0, raf = 0, last = 0, top = 0, bot = 0;
@@ -191,7 +210,7 @@
     last = now;
     if (!t0) t0 = now;
     let el = now - t0;
-    if (el > CYCLE) { idx = (idx + 1) % plays.length; t0 = now; el = 0; caption(); }
+    if (el > CYCLE) { if (!held) idx = (idx + 1) % plays.length; t0 = now; el = 0; caption(); }
     paint(plays[idx], ease(Math.min(1, el / DRAW)), el > DRAW + HOLD ? 1 - (el - DRAW - HOLD) / FADE : 1);
     raf = requestAnimationFrame(frame);
   }
@@ -266,8 +285,7 @@
   function caption() {
     const p = plays[idx]?.p; if (!p) { cap.hidden = true; return; }
     cap.hidden = false;
-    cap.textContent = "▶ " + p.caption + " ⓘ";
-    cap.title = (p.matchup ? p.matchup + ". " : "") + NOTE;
+    cap.innerHTML = "▶ " + escH(p.caption) + ' <span class="i">i</span>';
   }
 
   function size() {

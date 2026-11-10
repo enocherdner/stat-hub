@@ -1347,7 +1347,8 @@ V.roster = () => {
   const order = {QB: 0, RB: 1, WR: 2, TE: 3};
   const sorted = r.map(id => BY[id]).sort((a, b) => (order[a.pos] - order[b.pos]) || (b.ppg - a.ppg));
   return `<h1>My roster</h1><p class="muted small">Saved on this device only. Used in Trade and Start/Sit write-ups (positional need, depth, byes) and the News filter.</p>
-  <div class="pick" style="margin-top:10px"><input id="pk-rIds" placeholder="Add a player to my roster…" autocomplete="off"><div id="pks-rIds" class="sugg" hidden></div></div>
+  <div class="addrow"><button class="plus-btn" data-act="r-plus" aria-label="Add a player">＋</button>
+  <div class="pick grow"><input id="pk-rIds" placeholder="Add a player to my roster…" autocomplete="off"><div id="pks-rIds" class="sugg" hidden></div></div></div>
   <div class="card list">${sorted.length ? sorted.map(p => `<div class="pl-wrap">${plRow(p)}<button class="rm" data-rm="rIds" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join("") : '<p class="muted">No players yet. Search above or paste names below.</p>'}</div>
   <h2>Paste names</h2>
   <textarea id="names" rows="4" placeholder="One per line or comma separated"></textarea>
@@ -1519,6 +1520,12 @@ document.addEventListener("click", e => {
       break;
     }
     case "clear": setRoster([]); render(); break;
+    case "r-plus": {
+      const inp = $("#pk-rIds"), first = $("#pks-rIds:not([hidden]) [data-id], #pks-rIds:not([hidden]) button, #pks-rIds:not([hidden]) a");
+      if (inp && inp.value.trim() && first) first.click();
+      else if (inp) { inp.focus(); inp.scrollIntoView({block: "center", behavior: "smooth"}); }
+      break;
+    }
     case "ask-ss": ask(askSS()); break;
     case "whide": V.wHide = !V.wHide; render(); break;
     case "ss-clear": V.ssIds = []; V.ssOut = []; V.ssGroup = null; V.ssSlots = 3; V.ssN = 1; render(); break;
