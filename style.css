@@ -313,3 +313,5 @@ table.rt tbody td:last-child{border-right:1px solid var(--line);border-radius:0 
 /* the card you're typing in sits above its neighbours, so its suggestion list is never covered */
 .card:focus-within,.pick:focus-within,.tabsearch:focus-within{position:relative;z-index:50}
 .sugg{z-index:60}
+/* phone: the header search box is narrow, so drop its results full width under the whole header */
+@media (max-width:700px){.top .search{position:static}.top #sugg{left:10px;right:10px;top:calc(100% + 4px);max-height:65vh}}
