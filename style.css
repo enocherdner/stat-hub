@@ -315,3 +315,5 @@ table.rt tbody td:last-child{border-right:1px solid var(--line);border-radius:0 
 .sugg{z-index:60}
 /* phone: the header search box is narrow, so drop its results full width under the whole header */
 @media (max-width:700px){.top .search{position:static}.top #sugg{left:10px;right:10px;top:calc(100% + 4px);max-height:65vh}}
+/* header mark = the FF Stat Hub logo (same as the app icon and the Instagram picture) */
+:root[data-look="gameday"] .brand::before,.brand::before{content:"";display:inline-block;width:32px;height:32px;background:url(icons/icon-192.png?v=2) center/cover;border-radius:9px;vertical-align:-9px;margin-right:9px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
