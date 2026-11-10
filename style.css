@@ -272,3 +272,9 @@ td a,td a b{font-family:Inter,-apple-system,system-ui,sans-serif;font-size:14px;
 .tk{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;margin:1px 2px 1px 0;text-shadow:none;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--ink2)}
 .tk.good{border-color:rgba(52,208,88,.45)}.tk.bad{border-color:rgba(248,81,73,.5);color:var(--bad)}
 .tk.ffb{background:linear-gradient(90deg,rgba(255,196,0,.22),rgba(255,140,0,.18));border-color:rgba(255,196,0,.6);color:#ffd45c}
+
+/* tap-for-why tags */
+.has-tip{cursor:help}
+.has-tip .ib{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;border:1px solid currentColor;font:italic 700 9px/1 Georgia,serif;margin-left:3px;vertical-align:1px;opacity:.85}
+#tip{position:fixed;z-index:60;background:#0d1326;color:#e8ecf8;border:1px solid rgba(167,139,250,.6);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.5);text-shadow:none}
+#tip[hidden]{display:none}

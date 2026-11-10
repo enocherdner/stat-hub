@@ -349,9 +349,34 @@ function luck(id) {
 }
 function luckTag(id) {
   const L = luck(id); if (!L || !L.tag) return "";
-  return L.tag === "hot" ? `<span class="sig sell" title="${esc(L.flags.map(f => f.t).join(" "))}">HOT · SELL</span>`
-                         : `<span class="sig buy" title="${esc(L.flags.map(f => f.t).join(" "))}">DUE · BUY</span>`;
+  const why = L.flags.map(f => f.t).join(" ");
+  return L.tag === "hot" ? tipTag("sig sell", "HOT · SELL", `Why sell: ${why} He's scoring more than his usage supports, so his trade value is likely at its peak.`)
+                         : tipTag("sig buy", "DUE · BUY", `Why buy: ${why} His usage says better days are coming, so he may be cheap to trade for right now.`);
 }
+
+
+/* Tap-or-hover explanations for tags like HOT · SELL, so anyone can see why. */
+function tipTag(cls, label, text) {
+  return `<span class="${cls} has-tip" data-tip="${esc(text)}" title="${esc(text)}" tabindex="0" role="button">${esc(label)} <span class="ib" aria-hidden="true">i</span></span>`;
+}
+function showTip(el) {
+  let t = document.getElementById("tip");
+  if (!t) { t = document.createElement("div"); t.id = "tip"; t.setAttribute("role", "tooltip"); document.body.appendChild(t); }
+  if (t.dataset.for === el.dataset.tip && !t.hidden) { t.hidden = true; return; }
+  t.textContent = el.dataset.tip; t.dataset.for = el.dataset.tip; t.hidden = false;
+  const r = el.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
+  t.style.width = w + "px";
+  t.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + "px";
+  const below = r.bottom + 8 + t.offsetHeight < innerHeight;
+  t.style.top = (below ? r.bottom + 8 : r.top - t.offsetHeight - 8) + "px";
+}
+document.addEventListener("click", e => {
+  const el = e.target.closest(".has-tip");
+  if (el) { e.preventDefault(); e.stopPropagation(); showTip(el); return; }
+  const t = document.getElementById("tip"); if (t) t.hidden = true;
+}, true);
+document.addEventListener("keydown", e => { const el = e.target.closest && e.target.closest(".has-tip"); if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); showTip(el); } });
+addEventListener("scroll", () => { const t = document.getElementById("tip"); if (t) t.hidden = true; }, {passive: true});
 
 /* ---------------- usage charts (inline SVG, one series each) ---------------- */
 function spark(title, pts, fmt, max) {
@@ -496,9 +521,9 @@ const MIN_GP = 3;
 function rnk(i) { return `<span class="rk ${i === 0 ? "gold" : ""}">${i + 1}</span>`; }
 V.home = () => {
   setTab("home");
-  const view = V.home.view || "ppg";
+  const view = V.home.view || "wk";
   const pos = V.home.pos || "RB";
-  const sub = `<div class="subtabs"><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Matchups</button></div>`;
+  const sub = `<div class="subtabs"><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Best matchups ROS</button></div>`;
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
   const mxPos = pos === "FLEX" ? "RB" : pos;
   const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
@@ -560,8 +585,9 @@ function fpWeeklyList(pos, W0) {
   const banner = done === all.length
     ? `<div class="card small" style="margin:8px 0">Week ${wk} games are done, so each row shows what he actually scored next to the projection. Week ${wk + 1} rankings post Tuesday and swap in here automatically.</div>`
     : done ? `<p class="muted small">${done} of ${all.length} have played; those rows show what they scored.</p>` : "";
-  return `<p class="muted small">Week ${wk} · ordered by the expert consensus (${esc(W.source || "FantasyPros")}, ${(W.experts || {})[pos] || "?"} experts). Big number = their projected half-PPR points. "Ours" = our own projection from his usage, the matchup, teammates and injuries. Easy/Avg/Hard = what the opponent allows to ${pos === "FLEX" ? "the position" : pos + "s"}. Grade = FantasyPros start/sit grade.</p>
-  ${banner}<div class="card list">${rows}</div>`;
+  return `<p class="small"><b>Week ${wk} rankings</b> <span class="muted">· games ${weekDates(wk)} ·</span> <b>Expert consensus</b></p>
+  ${banner}<div class="card list">${rows}</div>
+  <p class="note">Sources: FantasyPros. Big number = projected half-PPR points. "Ours" = our own projection. Grade = FantasyPros start/sit grade.</p>`;
 }
 
 /* This week = expert consensus: FantasyPros (2x) + RotoWire + ESPN projections, nudged by what the Fantasy
@@ -606,9 +632,9 @@ function weeklyList(pos) {
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj)}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const ffbN = (C.ffb || []).length;
-  return `<p class="muted small"><b>Week ${T} rankings</b> (games ${weekDates(T)}) · Sources: ${esc([...(ffbN ? ["Fantasy Footballers"] : []), ...(C.sources || [])].join(", "))}. Proj pts = the sources' average. Updated ${ago(C.updated)}.</p>
+  return `<p class="small"><b>Week ${T} rankings</b> <span class="muted">· games ${weekDates(T)} ·</span> <b>Expert consensus</b></p>
   <div class="card list">${body}</div>
-`;
+  <p class="note">Sources: ${esc([...(ffbN ? ["Fantasy Footballers"] : []), ...(C.sources || [])].join(", "))}. Proj pts = the sources' average. Updated ${ago(C.updated)}.</p>`;
 }
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
@@ -647,7 +673,7 @@ function rosList(pos) {
   const body = rows.map((r, i) => {
     const p = r.id ? BY[r.id] : null;
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`;
-    const sig = r.sig ? `<span class="sig ${r.sig === "BUY" ? "buy" : "sell"}" title="Expert ${lbl}${r.ecrRank} vs our ${lbl}${r.ourRank}">${r.sig}</span>` : "";
+    const sig = r.sig ? tipTag(`sig ${r.sig === "BUY" ? "buy" : "sell"}`, r.sig, `Experts rank him ${lbl}${r.ecrRank}; our numbers rank him ${lbl}${r.ourRank}. ${r.sig === "BUY" ? "Our numbers like him more than the experts do, so he may be undervalued: a good time to trade for him." : "Our numbers like him less than the experts do, so he may be overvalued: a good time to trade him away."}${r.det ? " Why: " + sigWhy(r) + "." : ""}`) : "";
     const why = r.sig && r.det ? sigWhy(r) : "";
     return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${sig}<br><span class="muted small">${r.pos} · ${r.team}${r.bye ? " · bye " + r.bye : ""} · experts ${lbl}${r.ecrRank} (overall ${r.ecr}, range ${r.min}–${r.max})${r.ourRank ? ` · ours ${lbl}${r.ourRank}` : ""}</span>${why ? `<br><span class="tiny ${r.sig === "BUY" ? "v-good" : "v-bad"}">${esc(why)}</span>` : ""}</span>
       <span class="r"><b>${r.ours == null ? "–" : f1(r.ours)}</b><br><span class="muted tiny">our ROS pts</span></span></div>`;
@@ -872,10 +898,10 @@ function expertWaivers(posF, hide, mine, maxOwn) {
     return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} <span class="muted small">${esc(e.pos || "")} · ${esc(e.team || "")}</span> ${ownBadge(e.own)} ${p ? injBadge(p) : ""} ${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}<div style="margin-top:4px">${chips}</div>${notes}</span>
       <span class="r"><b>${n}</b><br><span class="muted tiny">source${n === 1 ? "" : "s"}</span></span></div>`;
   }).join("");
-  return `<p class="muted small"><b>Week ${X.week} waivers</b> (pickups for week ${X.week} games, ${weekDates(X.week)}). Sources: ${esc((X.sources || []).join(", ") || "none posted yet")}. Only players rostered in ${maxOwn}% of ESPN leagues or fewer${hidden ? ` (${hidden} hidden as likely taken)` : ""}. Updated ${ago(X.updated)}.</p>
+  return `<p class="small"><b>Week ${X.week} waivers</b> <span class="muted">· pickups for games ${weekDates(X.week)} ·</span> <b>Expert consensus</b></p>
   ${!ffbIn && ["Mon", "Tue"].includes(nowCT) ? `<div class="card small">Fantasy Footballers' picks aren't in yet (usually Tuesday around noon CT). They get added automatically.</div>` : ""}
   <div class="card list">${body || '<p class="muted">No expert waiver articles for this week yet.</p>'}</div>
-`;
+  <p class="note">Sources: ${esc((X.sources || []).join(", ") || "none posted yet")}. Showing players rostered in ${maxOwn}% of ESPN leagues or fewer${hidden ? ` (${hidden} hidden as likely taken)` : ""}. Updated ${ago(X.updated)}.</p>`;
 }
 
 /* ---- compare ---- */
