@@ -451,11 +451,11 @@ V.home = () => {
   setTab("home");
   const view = V.home.view || "ppg";
   const pos = V.home.pos || "RB";
-  const sub = `<div class="subtabs"><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Matchups</button></div>`;
+  const sub = `<div class="subtabs"><button class="${view === "ppg" ? "on" : ""}" data-view="ppg">Points per game</button><button class="${view === "wk" ? "on" : ""}" data-view="wk">This week</button><button class="${view === "ros" ? "on" : ""}" data-view="ros">Rest of season</button><button class="${view === "mx" ? "on" : ""}" data-view="mx">Matchups</button></div>`;
   const posSeg = `<div class="seg">${["QB","RB","WR","TE","FLEX","K","DEF"].map(x => `<button class="chip ${x === pos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
   const mxPos = pos === "FLEX" ? "RB" : pos;
   const mxSeg = `<div class="seg">${["QB","RB","WR","TE","K","DEF"].map(x => `<button class="chip ${x === mxPos ? "on" : ""}" data-pos="${x}">${x}</button>`).join("")}</div>`;
-  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + (view === "ros" ? rosList(pos) : ppgList(pos))}${stamp()}`;
+  return `<h1>Rankings</h1>${sub}${view === "mx" ? mxSeg + schedView(mxPos) : posSeg + (view === "ros" ? rosList(pos) : view === "wk" ? weeklyList(pos) : ppgList(pos))}${stamp()}`;
 };
 function ppgList(pos) {
   const n = LIST_LEN[pos];
@@ -481,6 +481,40 @@ function kRow(k, i) {
 }
 function defRow(d, i) {
   return `<div class="pl">${rnk(i)}<span class="grow"><b>${esc(d.team)} D/ST</b><br><span class="muted small">${d.gp} gp · ${d.sack} sacks · ${d.int} INT · ${d.fr} FR · ${d.td} TD · allows ${f1(d.papg)}/g</span></span><span class="r"><b>${f1(d.ppg)}</b><br><span class="muted tiny">ppg</span></span></div>`;
+}
+/* This week: FantasyPros weekly expert consensus + their projection, next to our own projection and the
+   matchup. Once a game is played, the row shows what he actually scored, so you can see who the experts missed. */
+const WEEK_LEN = {QB: 36, RB: 60, WR: 72, TE: 36, FLEX: 150, K: 32, DEF: 32};
+function gradeCls(g) { return !g ? "" : g[0] === "A" ? "v-good" : g[0] === "B" ? "" : "v-bad"; }
+function weeklyList(pos) {
+  const W = D.weekly || {}, all = (W.pos || {})[pos] || [];
+  if (!all.length) return `<p class="muted">Weekly rankings aren't loaded yet. They refresh every 3 hours.</p>`;
+  const wk = Number(W.week), done = all.filter(r => r.status === "closed").length;
+  const lbl = pos === "FLEX" ? "FLEX" : pos;
+  const rows = all.slice(0, WEEK_LEN[pos]).map((r, i) => {
+    const p = r.id ? BY[r.id] : null, mpos = r.pos;
+    let ours = null, act = null;
+    if (p && (D.stats[p.id] || []).length) {
+      const pr = project(p.id, wk); if (!pr.bye) ours = pr.proj;
+      const w = weeks(p.id).find(x => x.wk === wk); if (w) act = w.pts;
+    } else if (r.pos === "K" || r.pos === "DEF") {
+      const X = r.pos === "K" ? (D.kdef.K || []).find(k => k.team === r.team && norm(k.name) === norm(r.name)) : (D.kdef.DEF || []).find(d => d.team === r.team);
+      if (X) { ours = X.ppg * matchupFactor(r.oppid, r.pos).f; const w = (X.weeks || []).find(x => x[0] === wk); if (w) act = w[2]; }
+    }
+    if (r.status !== "closed") act = null;
+    if (act != null) ours = null;   // our projection would already include this game, so don't show it next to the result
+    const name = p ? `<a href="#/p/${p.id}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.pos === "DEF" ? r.name.replace(/ D\/?ST$/i, "") + " D/ST" : r.name)}</b>`;
+    const ez = r.oppid ? easeTag((D.teams.dvp[r.oppid] || {})[mpos], mpos) : "";
+    const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
+    return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} ${p ? injBadge(p) : ""} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
+      <span class="muted small">${r.pos} · ${r.team} ${esc(r.opp)} · experts ${esc(r.prank || lbl + (i + 1))} (range ${r.min}–${r.max})${ours != null ? ` · ours ${f1(ours)}` : ""}${actTxt}</span></span>
+      <span class="r"><b>${r.proj == null ? "–" : f1(r.proj)}</b><br><span class="muted tiny">proj pts</span></span></div>`;
+  }).join("");
+  const banner = done === all.length
+    ? `<div class="card small" style="margin:8px 0">Week ${wk} games are done, so each row shows what he actually scored next to the projection. Week ${wk + 1} rankings post Tuesday and swap in here automatically.</div>`
+    : done ? `<p class="muted small">${done} of ${all.length} have played; those rows show what they scored.</p>` : "";
+  return `<p class="muted small">Week ${wk} · ordered by the expert consensus (${esc(W.source || "FantasyPros")}, ${(W.experts || {})[pos] || "?"} experts). Big number = their projected half-PPR points. "Ours" = our own projection from his usage, the matchup, teammates and injuries. Easy/Avg/Hard = what the opponent allows to ${pos === "FLEX" ? "the position" : pos + "s"}. Grade = FantasyPros start/sit grade.</p>
+  ${banner}<div class="card list">${rows}</div>`;
 }
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
@@ -1072,6 +1106,7 @@ document.addEventListener("click", e => {
     D.news = await load("news").catch(() => ({cards: [], updated: D.meta.updated}));
     D.kdef = await load("kdef").catch(() => ({K: [], DEF: []}));
     D.ros = await load("ros").catch(() => ({players: []}));
+    D.weekly = await load("weekly").catch(() => ({pos: {}}));
     D.luck = await load("luck").catch(() => ({players: {}}));
     D.waivers = await load("waivers").catch(() => ({players: []}));
     buildKDefDvp();
