@@ -807,13 +807,31 @@ function recordWatch() {
   const miles = (R.milestones || []).map(m => `<div class="pl"><span class="grow">${link(m.id, m.name)} <span class="muted small">${esc(m.pos)} · ${esc(m.team)}</span><br>
     <span class="small ink2">${m.first ? `<b>${esc(m.label)}</b>: ${fmtN(m.total)} so far, ${fmtN(m.need)} to go` : `<b>${fmtN(m.need)}</b> ${esc(m.label.toLowerCase())} from <b>${fmtN(m.milestone)}</b> career (${fmtN(m.total)} now)`}</span></span>
     <span class="r"><b>~${m.games}</b><br><span class="muted tiny">game${m.games === 1 ? "" : "s"}</span></span></div>`).join("");
-  return `<p class="small"><b>Record watch</b> <span class="muted">· ${R.season} season through week ${R.week}</span></p>
+  return `<p class="small"><b>Record watch</b> <span class="muted">· ${R.season} season through week ${R.week} · this week's big games are in News → Week ${R.week} recap</span></p>
   <h2>Chasing history</h2><p class="muted small">Single-season NFL records and the closest chasers, on a 17-game pace.</p>${pace}
-  <h2>Week ${R.week} big games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
   <h2>Milestones coming up</h2><div class="card list">${miles || '<p class="muted">Nobody close to a milestone right now.</p>'}</div>
   <p class="note">Career numbers and career highs use regular-season games since ${R.since}. Records are the official NFL single-season marks.</p>`;
 }
 V.records = () => { setTab("records"); return `<h1>Records</h1>${recordWatch()}`; };
+
+/* Week recap (News tab): the week's big games with fantasy points in the chosen scoring, plus top scorers. */
+function weekPts(id, wk) { const w = weeks(id).find(x => x.wk === wk); return w ? w.pts : null; }
+function recapView() {
+  const R = D.records || {}, wk = R.week;
+  if (!wk) return `<p class="muted">No recap yet.</p>`;
+  const link = (id, name) => BY[id] ? `<a href="#/p/${id}"><b>${esc(name)}</b></a>` : `<b>${esc(name)}</b>`;
+  const big = (R.big || []).map(b => ({...b, pts: weekPts(b.id, wk)})).sort((a, b) => (b.pts ?? -1) - (a.pts ?? -1)).map((b, i) => { const pts = b.pts; return `<div class="pl">${rnk(i)}${BY[b.id] ? head(BY[b.id]) : ""}<span class="grow">${link(b.id, b.name)} <span class="muted small">${esc(b.pos)} · ${esc(b.team)} vs ${esc(b.opp)}</span><br>
+    ${b.feats.map(f => `<span class="tk good">${esc(f)}</span>`).join(" ")} ${b.highs.map(h => `<span class="tk ffb">🏆 ${esc(h)}</span>`).join(" ")}</span>
+    <span class="r"><b>${pts == null ? "–" : f1(pts)}</b><br><span class="muted tiny">pts</span></span></div>`; }).join("");
+  const top = ["QB", "RB", "WR", "TE"].map(pos => {
+    const xs = D.players.filter(p => p.pos === pos).map(p => ({p, pts: weekPts(p.id, wk)})).filter(x => x.pts != null).sort((a, b) => b.pts - a.pts).slice(0, 5);
+    return `<div class="col"><h2>Top ${pos}s</h2><div class="card list">${xs.map((x, i) => { const w = weeks(x.p.id).find(z => z.wk === wk);
+      return `<a class="pl" href="#/p/${x.p.id}">${rnk(i)}${head(x.p)}<span class="grow"><b>${esc(x.p.name)}</b> ${recBadge(x.p.id)}<br><span class="muted small">${x.p.team} ${w ? "vs " + w.opp : ""}</span></span><span class="r"><b>${f1(x.pts)}</b><br><span class="muted tiny">pts</span></span></a>`; }).join("")}</div></div>`;
+  }).join("");
+  return `<p class="small"><b>Week ${wk} recap</b> <span class="muted">· ${SCU()} points</span></p>
+  <h2>Big games</h2><div class="card list">${big || '<p class="muted">Nothing huge this week.</p>'}</div>
+  <div class="cols">${top}</div>`;
+}
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
 function sigWhy(r) {
@@ -1162,12 +1180,15 @@ V.news = () => {
   const nTop = D.news.cards.filter(isBig).length;
   if (filt === "mine") cards = cards.filter(c => mine.has(c.pid));
   else if (filt !== "all") cards = cards.filter(c => (BY[c.pid]?.pos || c.pos) === filt);
+  if (nv === "recap") return `<h1>News</h1>
+  <div class="subtabs"><button data-nv="top">Top news (${nTop})</button><button data-nv="all">All news</button><button class="on" data-nv="recap">Week ${D.records.week} recap</button></div>
+  ${recapView()}`;
   return `<h1>News</h1>
-  <div class="subtabs"><button class="${nv === "top" ? "on" : ""}" data-nv="top">Top news (${nTop})</button><button class="${nv === "all" ? "on" : ""}" data-nv="all">All news</button></div>
+  <div class="subtabs"><button class="${nv === "top" ? "on" : ""}" data-nv="top">Top news (${nTop})</button><button class="${nv === "all" ? "on" : ""}" data-nv="all">All news</button>${(D.records || {}).week ? `<button class="${nv === "recap" ? "on" : ""}" data-nv="recap">Week ${D.records.week} recap</button>` : ""}</div>
   <p class="muted small">Updated ${ago(D.news.updated)}.</p>
   ${tabSearch("news", "Search news: player, team…")}
   <div class="seg">${["all","mine","QB","RB","WR","TE"].map(x => `<button class="chip ${x === filt ? "on" : ""}" data-nf="${x}">${x === "all" ? "All" : x === "mine" ? "My roster" : x}</button>`).join("")}</div>
-  ${nv === "top" && (D.records?.big || []).length ? `<a class="card trophycard" href="#/records"><b>🏆 Week ${D.records.week} big games</b><div class="small ink2" style="margin-top:4px">${D.records.big.slice(0, 4).map(b => `<b>${esc(b.name)}</b>: ${esc([...b.highs.map(h => h.replace(/ \(.*\)/, "")), ...b.feats].slice(0, 2).join(", "))}`).join(" · ")}</div><div class="tiny muted" style="margin-top:4px">See Record watch →</div></a>` : ""}
+  ${nv === "top" && (D.records?.big || []).length ? `<a class="card trophycard" href="#/" data-nv="recap"><b>🏆 Week ${D.records.week} big games</b><div class="small ink2" style="margin-top:4px">${D.records.big.slice(0, 4).map(b => `<b>${esc(b.name)}</b>: ${esc([...b.highs.map(h => h.replace(/ \(.*\)/, "")), ...b.feats].slice(0, 2).join(", "))}`).join(" · ")}</div><div class="tiny muted" style="margin-top:4px">See the Week ${D.records.week} recap →</div></a>` : ""}
   <div class="news-grid">${cards.slice(0, 300).map(c => newsCard(c)).join("") || `<p class="muted">Nothing yet.</p>`}</div>`;
 };
 
