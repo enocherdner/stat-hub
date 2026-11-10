@@ -1,4 +1,4 @@
-/* FFStatHub — plain JS, no build step. Data comes from data/*.json written by ~/.atlas/bin/stathub. */
+/* FF Stat Hub — plain JS, no build step. Data comes from data/*.json written by ~/.atlas/bin/stathub. */
 "use strict";
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -289,7 +289,7 @@ function projectX(id, wk) {
   const pos = x.p.pos;
   const srcs = [e.ffbr && `Footballers ${pos}${e.ffbr}`, e.fp && `FantasyPros ${pos}${e.fp}`, e.rw && `RotoWire ${pos}${e.rw}`, e.es && `ESPN ${pos}${e.es}`].filter(Boolean).join(", ");
   const add = [{t: `Expert consensus: ${pos}${e.crank} this week (${srcs}), ${f1(e.proj)} pts. Our numbers: ${f1(ours)}. Blended 60/40 = ${f1(blend)}`, pos: e.proj > ours * 1.1, neg: e.proj < ours * 0.9}];
-  for (const t of e.ffb || []) add.push({t: `🎙 Footballers: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
+  for (const t of e.ffb || []) add.push({t: `Fantasy Footballers: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
   for (const t of (e.other || []).slice(0, 2)) add.push({t: `${t.src}: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`});
   x.why.unshift(...add);
   return x;
@@ -577,14 +577,14 @@ function lockCard(title, sub) { return `<div class="card" style="text-align:cent
 const TAKE_TXT = {start: "START", sit: "SIT", like: "LIKE", fade: "FADE", add: "ADD", stash: "STASH", drop: "DROP"};
 function takeChip(t, ffb) {
   const good = ["start", "like", "add", "stash"].includes(t.take);
-  return `<span class="tk ${good ? "good" : "bad"}${ffb ? " ffb" : ""}">${ffb ? "🎙 Footballers" : esc(t.src)}: ${TAKE_TXT[t.take] || esc(t.take)}</span>`;
+  return `<span class="tk ${good ? "good" : "bad"}${ffb ? " ffb" : ""}">${ffb ? "Fantasy Footballers" : esc(t.src)}: ${TAKE_TXT[t.take] || esc(t.take)}</span>`;
 }
 function weeklyList(pos) {
   const C = D.consensus || {}, T = C.week, rel = C.release ? new Date(C.release) : null;
   if (rel && Date.now() < rel) {
     const P = Number((D.weeklyPrev || {}).week) === T - 1 ? D.weeklyPrev : Number((D.weekly || {}).week) === T - 1 ? D.weekly : null;
     const recap = P ? `<h2>Week ${T - 1} recap: expert projections vs what they scored</h2>` + fpWeeklyList(pos, P) : "";
-    return lockCard(`Week ${T} rankings drop ${CT_FMT(rel)} CT`, `They're a consensus of FantasyPros' experts, RotoWire, ESPN and the Fantasy Footballers, and they keep updating through the week.`) + recap;
+    return lockCard(`Week ${T} rankings drop ${CT_FMT(rel)} CT`, `Sources: Fantasy Footballers, FantasyPros, RotoWire, ESPN.`) + recap;
   }
   const rows = (C.pos || {})[pos];
   if (!rows || !rows.length) return fpWeeklyList(pos);
@@ -597,8 +597,8 @@ function weeklyList(pos) {
     const w = weeks(p.id).find(x => x.wk === T);
     const act = w ? w.pts : null;
     const ez = oppid ? easeTag((D.teams.dvp[oppid] || {})[ppos], ppos) : "";
-    const srcs = [r.ffbr && `🎙 Footballers ${ppos}${r.ffbr}`, r.fp && `FantasyPros ${ppos}${r.fp}`, r.rw && `RotoWire ${ppos}${r.rw}`, r.es && `ESPN ${ppos}${r.es}`].filter(Boolean).join(" · ");
-    const ffb = (r.ffb || []).slice(0, 1).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, true)} <span class="ink2">${esc(t.note)}</span> <a class="muted" href="${esc(t.link)}" target="_blank" rel="noopener">source</a></div>`).join("");
+    const srcs = [r.ffbr && `Fantasy Footballers ${ppos}${r.ffbr}`, r.fp && `FantasyPros ${ppos}${r.fp}`, r.rw && `RotoWire ${ppos}${r.rw}`, r.es && `ESPN ${ppos}${r.es}`].filter(Boolean).join(" · ");
+    const ffb = (r.ffb || []).slice(0, 1).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, true)} <span class="ink2">${esc(t.note)}</span></div>`).join("");
     const oth = (r.other || []).slice(0, 2).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, false)} <span class="muted">${esc(t.note)}</span></div>`).join("");
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
     return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${injBadge(p)} ${ez}${r.grade ? ` <span class="tiny ${gradeCls(r.grade)}" title="FantasyPros start/sit grade"><b>${esc(r.grade)}</b></span>` : ""}<br>
@@ -606,9 +606,9 @@ function weeklyList(pos) {
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj)}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const ffbN = (C.ffb || []).length;
-  return `<p class="muted small"><b>Week ${T} rankings</b> (games ${weekDates(T)}) · expert consensus · ${esc((C.sources || []).join(" + "))}${ffbN ? ` + Fantasy Footballers (${ffbN} free articles/episodes so far)` : " · Fantasy Footballers' takes get added as their articles and episodes come out"}. FantasyPros and the Footballers' own ranks (from their free Rankings Audit) count double. A Footballers START/LIKE moves a player up and a SIT/FADE moves him down. It recalculates every 15 minutes as new rankings, articles and their podcast come out. Proj pts = the average of the sources. Updated ${ago(C.updated)}.</p>
+  return `<p class="muted small"><b>Week ${T} rankings</b> (games ${weekDates(T)}) · Sources: ${esc([...(ffbN ? ["Fantasy Footballers"] : []), ...(C.sources || [])].join(", "))}. Proj pts = the sources' average. Updated ${ago(C.updated)}.</p>
   <div class="card list">${body}</div>
-  ${ffbN ? `<p class="note">Footballers sources: ${(C.ffb || []).map(a => `<a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.title)}</a>`).join(" · ")}</p>` : ""}`;
+`;
 }
 /* Rest of season: FantasyPros expert consensus next to our own ROS score; big gaps = buy/sell. */
 function gamesLeft(team) { return nextGames(team, nextWeek()).length; }
@@ -855,7 +855,7 @@ V.waivers = () => {
 /* Expert waiver consensus: who the free expert articles say to add, Footballers (article + podcast) counted double. */
 function expertWaivers(posF, hide, mine, maxOwn) {
   const X = D.wcons || {players: []}, rel = X.release ? new Date(X.release) : null;
-  if (rel && Date.now() < rel) return lockCard(`Week ${X.week} waivers (expert consensus) open ${CT_FMT(rel)} CT`, "Right after Monday night. FantasyPros, RotoBaller and Sleeper's trending adds show up first. The Fantasy Footballers' waiver article and podcast get added the moment they drop (usually Tuesday around noon).");
+  if (rel && Date.now() < rel) return lockCard(`Week ${X.week} waivers (expert consensus) open ${CT_FMT(rel)} CT`, "Right after Monday night. Sources: Fantasy Footballers, FantasyPros, RotoBaller, Sleeper.");
   let list = X.players || [];
   const hidden = list.filter(e => e.own != null && e.own > maxOwn).length;
   list = list.filter(e => e.own == null || e.own <= maxOwn);
@@ -866,16 +866,16 @@ function expertWaivers(posF, hide, mine, maxOwn) {
   const body = list.slice(0, 40).map((e, i) => {
     const p = e.id ? BY[e.id] : null;
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(p.name)}</b></a>` : `<b>${esc(e.name)}</b>`;
-    const chips = Object.keys(e.srcs).sort((a, b) => (b === "Fantasy Footballers") - (a === "Fantasy Footballers")).map(s => `<span class="tk good${s === "Fantasy Footballers" ? " ffb" : ""}">${s === "Fantasy Footballers" ? "🎙 Footballers" : esc(s)}${s === "Sleeper adds" && e.adds ? " " + e.adds.toLocaleString() : ""}</span>`).join(" ");
-    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="${n.src === "Fantasy Footballers" ? "v-good" : "muted"}">${n.src === "Fantasy Footballers" ? "🎙" : esc(n.src) + ":"}</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("");
+    const chips = Object.keys(e.srcs).sort((a, b) => (b === "Fantasy Footballers") - (a === "Fantasy Footballers")).map(s => `<span class="tk good${s === "Fantasy Footballers" ? " ffb" : ""}">${esc(s)}</span>`).join(" ");
+    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="${n.src === "Fantasy Footballers" ? "v-good" : "muted"}">${esc(n.src)}:</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("");
     const n = Object.keys(e.srcs).length;
     return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} <span class="muted small">${esc(e.pos || "")} · ${esc(e.team || "")}</span> ${ownBadge(e.own)} ${p ? injBadge(p) : ""} ${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}<div style="margin-top:4px">${chips}</div>${notes}</span>
       <span class="r"><b>${n}</b><br><span class="muted tiny">source${n === 1 ? "" : "s"}</span></span></div>`;
   }).join("");
-  return `<p class="muted small"><b>Week ${X.week} waivers</b> (pickups for week ${X.week} games, ${weekDates(X.week)}). The experts agree on these:  ${esc((X.sources || []).join(", ") || "nothing posted yet")}. Fantasy Footballers count double, and a top-5 pick counts extra. Only players rostered in ${maxOwn}% of ESPN leagues or fewer${hidden ? ` (${hidden} hidden as likely taken)` : ""}. Updated ${ago(X.updated)}.</p>
-  ${!ffbIn && ["Mon", "Tue"].includes(nowCT) ? `<div class="card small">🎙 The Fantasy Footballers' waiver picks aren't in yet. Their article and podcast usually drop Tuesday around noon CT, and they get added automatically.</div>` : ""}
+  return `<p class="muted small"><b>Week ${X.week} waivers</b> (pickups for week ${X.week} games, ${weekDates(X.week)}). Sources: ${esc((X.sources || []).join(", ") || "none posted yet")}. Only players rostered in ${maxOwn}% of ESPN leagues or fewer${hidden ? ` (${hidden} hidden as likely taken)` : ""}. Updated ${ago(X.updated)}.</p>
+  ${!ffbIn && ["Mon", "Tue"].includes(nowCT) ? `<div class="card small">Fantasy Footballers' picks aren't in yet (usually Tuesday around noon CT). They get added automatically.</div>` : ""}
   <div class="card list">${body || '<p class="muted">No expert waiver articles for this week yet.</p>'}</div>
-  ${(X.articles || []).length ? `<p class="note">Read: ${X.articles.map(a => `<a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.src)}: ${esc(a.title)}</a>`).join(" · ")}</p>` : ""}`;
+`;
 }
 
 /* ---- compare ---- */
@@ -997,7 +997,7 @@ V.ss = () => {
       <div class="small" style="margin-top:2px">${i < V.ssN ? '<b class="v-good">START</b>' : '<b class="v-bad">SIT</b>'}</div>
       <ul class="why">${x.why.map(w => `<li class="${w.neg ? "v-bad" : w.pos ? "v-good" : ""}" style="color:${w.neg || w.pos ? "" : "var(--ink2)"}">${esc(w.t)}</li>`).join("")}</ul></div>
       <div class="proj"><b>${f1(x.proj)}</b><span class="muted tiny">proj pts</span><div class="tiny muted" style="margin-top:4px">${x.bye ? "" : `${f1(x.floor)}–${f1(x.ceil)}`}</div></div></div>`).join("") +
-      `</div><p class="note">${roster().length ? "Your roster is factored into the write-up (depth, byes, who else you could start). " : ""}Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. ${expertPending(wk) ? `The week ${wk} expert consensus lands ${CT_FMT(expertPending(wk))} CT; until then this is our numbers only: ` : `Projection = 60% expert consensus (FantasyPros, RotoWire, ESPN, nudged by the Fantasy Footballers) + 40% our numbers. Ours = `}60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
+      `</div><p class="note">${roster().length ? "Your roster is factored into the write-up (depth, byes, who else you could start). " : ""}Ranked across positions on projected half-PPR points, so RB vs WR vs TE works like a FLEX call; the small range is floor–ceiling. ${expertPending(wk) ? `The week ${wk} expert consensus lands ${CT_FMT(expertPending(wk))} CT; until then this is our numbers only: ` : `Projection = 60% expert consensus (Fantasy Footballers, FantasyPros, RotoWire, ESPN) + 40% our numbers. Ours = `}60% last-4 average + 40% season average, × matchup (points the defense allows to the position, half weight), × backfield/room changes, × injury. Every factor is listed.</p>
       <button class="btn ghost" data-act="ask-ss">Ask the coach on Telegram</button>`;
   }
   return `<h1>Start / Sit</h1><p class="muted small"><b>Week ${wk} start/sit</b> (games ${weekDates(wk)}). Add 3 or more players, any positions. It ranks them all like a FLEX call.</p>
@@ -1067,12 +1067,12 @@ async function ask(text) {
 }
 function askSS() {
   const {wk, res} = V.ssLast;
-  return `Start/sit, week ${wk}, half PPR, starting ${V.ssLast.start}. My FFStatHub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
+  return `Start/sit, week ${wk}, half PPR, starting ${V.ssLast.start}. My FF Stat Hub numbers:\n` + res.map((x, i) => `${i + 1}. ${x.p.name} (${x.p.pos} ${x.p.team}) proj ${f1(x.proj)}: ` + x.why.map(w => w.t).join("; ")).join("\n") + `\nWho do I start? Short answer, Footballers take if they covered it.`;
 }
 function askTrade() {
   const {G, R, tg, tr, verdict} = V.tradeLast;
   const l = x => `${x.p.name} (${x.p.pos} ${x.p.team}): ROS ${f1(x.total)}, ${f1(x.base)}/g, L4 ${f1(x.S.l4.ppg)}, season ${f1(x.S.s.ppg)}, ${x.games - x.miss} games left, sched ${x.sos.toFixed(2)}, ${x.p.inj || "healthy"}`;
-  return `Trade check, half PPR. FFStatHub says ${verdict[0]} (give ${f1(tg)} vs get ${f1(tr)} ROS pts).\nI give: ${G.map(l).join(" | ")}\nI get: ${R.map(l).join(" | ")}\nYour take in a few lines?`;
+  return `Trade check, half PPR. FF Stat Hub says ${verdict[0]} (give ${f1(tg)} vs get ${f1(tr)} ROS pts).\nI give: ${G.map(l).join(" | ")}\nI get: ${R.map(l).join(" | ")}\nYour take in a few lines?`;
 }
 
 /* ---------------- written analysis (Claude, only when he asks; cached per player set per day) ---------------- */
