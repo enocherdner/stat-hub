@@ -1079,7 +1079,7 @@ function askTrade() {
 const ANA = {};   // key -> {status, text, ...}
 // Where write-ups get made: the iMac serves the site itself (same origin); on the public site the MacBook runs
 // the same service at localhost:8766 (stathub serve, launchd com.enoch.stathub-serve). The phone has neither.
-const API = /github\.io$/.test(location.hostname) ? "http://localhost:8766" : "";
+const API = /github\.io$|ffstathub\.com$/.test(location.hostname) ? "http://localhost:8766" : "";
 function anaKey(kind, ids) { return kind + ":" + (kind === "compare" ? [...ids].sort() : ids).join(","); }
 function anaPanel(kind, ids, auto) {
   const k = anaKey(kind, ids), st = ANA[k];
