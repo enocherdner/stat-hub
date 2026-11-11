@@ -306,11 +306,17 @@ function ros(id) {
 
 
 /* ---------------- expert consensus, used across the hub (start/sit, compare, trade) ---------------- */
+/* Rank order = the projected points shown (in the chosen scoring), so #1 always has the most points. Ties keep the expert order. */
+function rankRows(pos) {
+  const rows = ((D.consensus || {}).pos || {})[pos] || [];
+  const v = r => r.proj == null ? -1 : r.proj * scF(r.id);
+  return rows.map((r, i) => [r, i]).sort((a, b) => (v(b[0]) - v(a[0])) || (a[1] - b[1])).map(x => x[0]);
+}
 function expertWeek(id, wk) {
   const C = D.consensus || {};
   if (C.week !== wk || (C.release && Date.now() < new Date(C.release))) return null;
   const p = BY[id]; if (!p) return null;
-  const rows = (C.pos || {})[p.pos] || [];
+  const rows = rankRows(p.pos);
   const i = rows.findIndex(r => r.id === id);
   return i < 0 ? null : {...rows[i], crank: i + 1};
 }
@@ -756,8 +762,8 @@ function weeklyList(pos) {
     const recap = P ? `<h2>Week ${T - 1} recap: expert projections vs what they scored</h2>` + fpWeeklyList(pos, P) : "";
     return lockCard(`Week ${T} rankings drop ${CT_FMT(rel)} CT`, `FF Stat Hub Consensus: built from public expert rankings plus our own model.`) + recap;
   }
-  const rows = (C.pos || {})[pos];
-  if (!rows || !rows.length) return fpWeeklyList(pos);
+  const rows = rankRows(pos);
+  if (!rows.length) return fpWeeklyList(pos);
   const lbl = pos;
   const body = rows.slice(0, WEEK_LEN[pos]).map((r, i) => {
     const p = BY[r.id]; if (!p) return "";
