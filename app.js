@@ -777,7 +777,7 @@ function weeklyList(pos) {
     const oth = (r.other || []).slice(0, 2).map(t => `<div class="tiny" style="margin-top:3px">${takeChip(t, false)} <span class="muted">${esc(t.note)}</span></div>`).join("");
     const actTxt = act == null ? "" : ` · <b class="${r.proj && act >= r.proj ? "v-good" : r.proj && act < r.proj * 0.7 ? "v-bad" : ""}">scored ${f1(act)}</b>`;
     return `<div class="pl">${rnk(i)}${head(p)}<span class="grow"><a href="#/p/${p.id}"><b>${esc(p.name)}</b></a> ${recBadge(p.id)} ${injBadge(p)} ${ez}<br>
-      <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")}${actTxt}${p.gp ? ` · season ${f1(sum(weeks(p.id), "pts"))} pts` : ""}</span>${ffb}${oth}</span>
+      <span class="muted small">${ppos} · ${p.team} ${esc(oppTxt || "")}${actTxt}${p.gp ? ` · season ${f1(sum(weeks(p.id), "pts"))} pts` : ""}</span>${r.bump ? `<div class="tiny v-good" style="margin-top:3px">↑ ${esc(r.bump)}</div>` : ""}${ffb}${oth}</span>
       <span class="r"><b>${r.proj == null ? "–" : f1(r.proj * scF(r.id))}</b><br><span class="muted tiny">proj pts</span></span></div>`;
   }).join("");
   const ffbN = (C.ffb || []).length;
@@ -1555,6 +1555,9 @@ document.addEventListener("click", e => {
     D.luck = await load("luck").catch(() => ({players: {}}));
     D.waivers = await load("waivers").catch(() => ({players: []}));
     D.records = await load("records").catch(() => ({}));
+    for (const [id, head] of Object.entries((D.consensus || {}).out || {})) {   // ruled out in this week's news -> Out site-wide
+      const p = D.players.find(q => q.id === id); if (p && !OUT.has(p.inj)) { p.inj = "Out"; p.injn = head; }
+    }
     buildKDefDvp();
     applyScoring();
   } catch (e) {
