@@ -334,8 +334,8 @@ function projectX(id, wk) {
   x.floor = ours > 0 ? x.floor * k : blend * 0.75; x.ceil = ours > 0 ? x.ceil * k : blend * 1.25;
   const pos = x.p.pos;
   const add = [{t: `FF Stat Hub consensus: ${pos}${e.crank} this week, ${f1(e.proj)} pts. Our numbers: ${f1(ours)}. Blended 60/40 = ${f1(blend)}`, pos: e.proj > ours * 1.1, neg: e.proj < ours * 0.9}];
-  for (const t of e.ffb || []) add.push({t: `Expert take: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
-  for (const t of (e.other || []).slice(0, 2)) add.push({t: `Expert take: ${(TAKE_TXT[t.take] || t.take)}: ${t.note}`});
+  for (const t of e.ffb || []) add.push({t: `${(TAKE_TXT[t.take] || t.take)}: ${t.note}`, pos: ["start", "like"].includes(t.take), neg: ["sit", "fade"].includes(t.take)});
+  for (const t of (e.other || []).slice(0, 2)) add.push({t: `${(TAKE_TXT[t.take] || t.take)}: ${t.note}`});
   x.why.unshift(...add);
   return x;
 }
@@ -753,7 +753,7 @@ function lockCard(title, sub) { return `<div class="card" style="text-align:cent
 const TAKE_TXT = {start: "START", sit: "SIT", like: "LIKE", fade: "FADE", add: "ADD", stash: "STASH", drop: "DROP"};
 function takeChip(t, ffb) {
   const good = ["start", "like", "add", "stash"].includes(t.take);
-  return `<span class="tk ${good ? "good" : "bad"}${ffb ? " ffb" : ""}">Expert: ${TAKE_TXT[t.take] || esc(t.take)}</span>`;
+  return `<span class="tk ${good ? "good" : "bad"}${ffb ? " ffb" : ""}">${TAKE_TXT[t.take] || esc(t.take)}</span>`;
 }
 function weeklyList(pos) {
   const C = D.consensus || {}, T = C.week, rel = C.release ? new Date(C.release) : null;
@@ -1134,10 +1134,10 @@ function expertWaivers(posF, hide, mine, maxOwn) {
   const body = list.slice(0, 40).map((e, i) => {
     const p = e.id ? BY[e.id] : null;
     const name = p ? `<a href="#/p/${p.id}"><b>${esc(p.name)}</b></a>` : `<b>${esc(e.name)}</b>`;
-    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="muted">Expert:</span> <span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("") + (e.flag ? `<div class="tiny" style="margin-top:4px;color:var(--bad,#e5484d)"><b>Update:</b> ${esc(e.flag)}</div>` : "");
+    const notes = (e.notes || []).slice(0, 2).map(n => `<div class="tiny" style="margin-top:3px"><span class="ink2">${esc(n.note)}</span>${n.take === "stash" ? ' <span class="muted">(stash)</span>' : ""}</div>`).join("") + (e.flag ? `<div class="tiny" style="margin-top:4px;color:var(--bad,#e5484d)"><b>Update:</b> ${esc(e.flag)}</div>` : "");
     const n = Object.keys(e.srcs).length;
     return `<div class="pl">${rnk(i)}${p ? head(p) : ""}<span class="grow">${name} <span class="muted small">${esc(e.pos || "")} · ${esc(e.team || "")}</span> ${ownBadge(e.own)} ${p ? injBadge(p) : ""} ${mine.has(e.id) ? '<span class="badge">on my roster</span>' : ""}${notes}</span>
-      <span class="r"><b>${n}</b><br><span class="muted tiny">expert${n === 1 ? "" : "s"}</span></span></div>`;
+      <span class="r"><b>${n}</b><br><span class="muted tiny">${n === 1 ? "list" : "lists"}</span></span></div>`;
   }).join("");
   return `<p class="small"><b>Week ${X.week} waivers</b> <span class="muted">· pickups for games ${weekDates(X.week)} ·</span> <b>Expert consensus</b></p>
   <div class="card list">${body || '<p class="muted">No expert waiver articles for this week yet.</p>'}</div>
